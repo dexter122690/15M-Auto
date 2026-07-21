@@ -56,6 +56,12 @@
 
   function hideSignIn() { const modal = document.getElementById('cloudSignIn'); if (modal) modal.remove(); }
 
+  function applyBrandLogo() {
+    document.querySelectorAll('img[src="15m-autocare-logo.png"]').forEach(function (image) {
+      image.src = 'new%20logo%2015m.png';
+    });
+  }
+
   function readDashboard() {
     try { return JSON.parse(localStorage.getItem('15m-owner-report') || '{}'); }
     catch (_) { return {}; }
@@ -91,6 +97,7 @@
 
   async function begin() {
     addStyles();
+    applyBrandLogo();
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
     script.onload = async function () {
