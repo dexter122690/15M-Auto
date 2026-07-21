@@ -15,7 +15,7 @@
     style.textContent = `
       #cloudSignIn{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(0,0,0,.72);padding:20px;font-family:Arial,sans-serif}
       #cloudSignIn .cloud-card{width:min(430px,100%);background:#fffaf7;border:2px solid #ff5a16;border-radius:18px;padding:28px;color:#24130c;box-shadow:0 20px 60px rgba(0,0,0,.45)}
-      #cloudSignIn h2{margin:0 0 8px;color:#e64a0c}.cloud-card p{line-height:1.45}.cloud-card input{box-sizing:border-box;width:100%;padding:12px;border:1px solid #d9c9bf;border-radius:9px;margin:10px 0;font-size:15px}.cloud-card button{width:100%;padding:12px;border:0;border-radius:9px;background:#ff5a16;color:#fff;font-weight:700;cursor:pointer}.cloud-card small{display:block;margin-top:12px;color:#765}
+      #cloudSignIn h2{margin:0 0 8px;color:#e64a0c}.cloud-card p{line-height:1.45}.cloud-card input{box-sizing:border-box;width:100%;padding:12px;border:1px solid #d9c9bf;border-radius:9px;margin:10px 0;font-size:15px}.cloud-card button{width:100%;padding:12px;border:0;border-radius:9px;background:#ff5a16;color:#fff;font-weight:700;cursor:pointer}.cloud-card .cloud-secondary{margin-top:9px;background:transparent;color:#5c3522;border:1px solid #cbb7ab}.cloud-card small{display:block;margin-top:12px;color:#765}
       #cloudStatus{position:fixed;right:14px;bottom:14px;z-index:9990;background:#151515;color:#fff;padding:8px 11px;border-radius:999px;font:12px Arial,sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.25)}
     `;
     document.head.appendChild(style);
@@ -25,6 +25,7 @@
     let el = document.getElementById('cloudStatus');
     if (!el) { el = document.createElement('div'); el.id = 'cloudStatus'; document.body.appendChild(el); }
     el.textContent = message;
+    el.onclick = function () { showSignIn('Sign in whenever you are ready to sync this device.'); };
   }
 
   function showSignIn(message) {
@@ -33,7 +34,7 @@
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'cloudSignIn';
-      modal.innerHTML = `<div class="cloud-card"><h2>15M Secure Cloud</h2><p>Sign in with your work email to securely sync the business records across devices.</p><input id="cloudEmail" type="email" placeholder="Work email address" autocomplete="email"><button id="cloudSendLink" type="button">Send secure sign-in link</button><small id="cloudMessage"></small></div>`;
+      modal.innerHTML = `<div class="cloud-card"><h2>15M Secure Cloud</h2><p>Sign in with your work email to securely sync the business records across devices. You can also continue using the dashboard now and set up sync later.</p><input id="cloudEmail" type="email" placeholder="Work email address" autocomplete="email"><button id="cloudSendLink" type="button">Send secure sign-in link</button><button id="cloudContinue" class="cloud-secondary" type="button">Continue without cloud sync</button><small id="cloudMessage"></small></div>`;
       document.body.appendChild(modal);
       document.getElementById('cloudSendLink').addEventListener('click', async function () {
         const email = document.getElementById('cloudEmail').value.trim();
@@ -44,6 +45,10 @@
         const result = await client.auth.signInWithOtp({ email: email, options: { emailRedirectTo: location.origin + location.pathname } });
         this.disabled = false;
         messageEl.textContent = result.error ? result.error.message : 'Check your email and open the secure sign-in link.';
+      });
+      document.getElementById('cloudContinue').addEventListener('click', function () {
+        modal.remove();
+        status('Using this device only - tap here to set up cloud sync');
       });
     }
     document.getElementById('cloudMessage').textContent = message || 'Your records remain protected until you sign in.';
