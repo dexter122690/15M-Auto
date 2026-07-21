@@ -75,13 +75,13 @@
       return button.textContent.trim() === 'Invoice Making';
     });
     const dashboard = document.getElementById('dashboard');
-    if (!dashboardButton || !dashboard || typeof window.tab !== 'function') return;
+    if (!dashboardButton || !dashboard || typeof tab !== 'function') return;
 
     const openDashboard = function () {
       const entered = window.prompt('Enter dashboard passcode:');
       if (entered === '002626') {
         sessionStorage.setItem('15m-dashboard-unlocked', 'yes');
-        window.tab('dashboard', dashboardButton);
+        tab('dashboard', dashboardButton);
       } else if (entered !== null) {
         window.alert('Incorrect passcode.');
       }
@@ -95,7 +95,7 @@
     }, true);
 
     if (sessionStorage.getItem('15m-dashboard-unlocked') !== 'yes' && dashboard.classList.contains('active') && invoiceButton) {
-      window.tab('invoices', invoiceButton);
+      tab('invoices', invoiceButton);
     }
   }
 
