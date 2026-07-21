@@ -67,6 +67,38 @@
     new MutationObserver(setLogo).observe(document.body, { childList: true, subtree: true });
   }
 
+  function protectDashboard() {
+    const dashboardButton = Array.from(document.querySelectorAll('.tabs button')).find(function (button) {
+      return button.textContent.trim() === 'Dashboard';
+    });
+    const invoiceButton = Array.from(document.querySelectorAll('.tabs button')).find(function (button) {
+      return button.textContent.trim() === 'Invoice Making';
+    });
+    const dashboard = document.getElementById('dashboard');
+    if (!dashboardButton || !dashboard || typeof window.tab !== 'function') return;
+
+    const openDashboard = function () {
+      const entered = window.prompt('Enter dashboard passcode:');
+      if (entered === '002626') {
+        sessionStorage.setItem('15m-dashboard-unlocked', 'yes');
+        window.tab('dashboard', dashboardButton);
+      } else if (entered !== null) {
+        window.alert('Incorrect passcode.');
+      }
+    };
+
+    dashboardButton.addEventListener('click', function (event) {
+      if (sessionStorage.getItem('15m-dashboard-unlocked') === 'yes') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openDashboard();
+    }, true);
+
+    if (sessionStorage.getItem('15m-dashboard-unlocked') !== 'yes' && dashboard.classList.contains('active') && invoiceButton) {
+      window.tab('invoices', invoiceButton);
+    }
+  }
+
   function readDashboard() {
     try { return JSON.parse(localStorage.getItem('15m-owner-report') || '{}'); }
     catch (_) { return {}; }
@@ -103,6 +135,7 @@
   async function begin() {
     addStyles();
     applyBrandLogo();
+    protectDashboard();
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
     script.onload = async function () {
