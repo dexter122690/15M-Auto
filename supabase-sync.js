@@ -57,9 +57,14 @@
   function hideSignIn() { const modal = document.getElementById('cloudSignIn'); if (modal) modal.remove(); }
 
   function applyBrandLogo() {
-    document.querySelectorAll('img[src="15m-autocare-logo.png"]').forEach(function (image) {
-      image.src = 'new%20logo%2015m.png';
-    });
+    const logoPath = 'new%20logo%2015m.png';
+    const setLogo = function () {
+      document.querySelectorAll('.logo, img[alt="15M Autocare logo"], img[src="15m-autocare-logo.png"]').forEach(function (image) {
+        if (image.getAttribute('src') !== logoPath) image.src = logoPath;
+      });
+    };
+    setLogo();
+    new MutationObserver(setLogo).observe(document.body, { childList: true, subtree: true });
   }
 
   function readDashboard() {
