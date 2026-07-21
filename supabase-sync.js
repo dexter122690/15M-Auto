@@ -29,7 +29,7 @@
 
   function showSignIn(message) {
     addStyles();
-    let modal = document.getElemById('cloudSignIn');
+    let modal = document.getElementById('cloudSignIn');
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'cloudSignIn';
