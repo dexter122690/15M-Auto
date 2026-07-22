@@ -43,13 +43,13 @@
 
   function isOwner() { return !!(currentSession && currentSession.user && String(currentSession.user.email).toLowerCase() === OWNER_EMAIL); }
   function assignedBranch() { const email = currentSession && currentSession.user && currentSession.user.email ? String(currentSession.user.email).toLowerCase() : ''; return BRANCH_ACCESS[email] || null; }
-  function canOpenBranch(id) {
+  function canOpenBranch(id, suppliedPassword) {
     if (isOwner()) return true;
     const assignment = assignedBranch();
     if (!assignment || assignment.id !== id) { window.alert('Your account is assigned to a different branch.'); return false; }
     const unlockKey = '15m-branch-unlocked-' + (currentSession && currentSession.user ? currentSession.user.id : '') + '-' + id;
     if (sessionStorage.getItem(unlockKey) === 'yes') return true;
-    const entered = window.prompt('Enter the access password for this branch:');
+    const entered = suppliedPassword === undefined ? window.prompt('Enter the access password for this branch:') : suppliedPassword;
     if (entered === assignment.password) { sessionStorage.setItem(unlockKey, 'yes'); return true; }
     if (entered !== null) window.alert('Incorrect branch password.');
     return false;
@@ -80,6 +80,18 @@
     const rejected = approval && approval.status === 'rejected';
     modal.innerHTML = `<div class="cloud-card"><h2>${rejected ? 'Access not approved' : 'Approval needed'}</h2><p>${rejected ? 'This account was not approved. Please contact the 15M owner if you believe this is a mistake.' : 'Your account is ready, but the owner must approve it before you can view the business records.'}</p><small>Signed in as ${currentSession && currentSession.user.email ? currentSession.user.email : ''}</small><button id="cloudSignOut" class="cloud-secondary" type="button">Sign out</button></div>`;
     document.getElementById('cloudSignOut').onclick = function () { client.auth.signOut(); removeModal('cloudPending'); showSignIn('You have signed out.'); };
+  }
+
+  function chooseOpeningBranch() {
+    return new Promise(function (resolve) {
+      addStyles(); removeModal('cloudSignIn'); removeModal('cloudPending'); removeModal('cloudApprovals');
+      const assignment = assignedBranch();
+      const choices = isOwner() ? [{ id: 'sta-rosa', name: '15M Sta. Rosa' }, { id: '15m-sto-tomas', name: '15M Sto. Tomas' }, { id: 'all', name: 'All branches (owner)' }] : (assignment ? [{ id: assignment.id, name: assignment.id === 'sta-rosa' ? '15M Sta. Rosa' : '15M Sto. Tomas' }] : []);
+      let modal = document.getElementById('branchGate');
+      if (!modal) { modal = document.createElement('div'); modal.id = 'branchGate'; modal.className = 'cloud-overlay'; document.body.appendChild(modal); }
+      modal.innerHTML = '<div class="cloud-card"><h2>Open a branch</h2><p>Select the 15M branch you need to use.</p><label>Branch</label><select id="openingBranch">' + choices.map(function (branch) { return '<option value="' + branch.id + '">' + branch.name + '</option>'; }).join('') + '</select>' + (isOwner() ? '' : '<label>Branch password</label><input id="openingBranchPassword" type="password" autocomplete="current-password" placeholder="Enter branch password">') + '<button id="openBranchButton" type="button">Open branch</button><small id="branchGateMessage"></small></div>';
+      document.getElementById('openBranchButton').onclick = function () { const id = document.getElementById('openingBranch').value; const password = document.getElementById('openingBranchPassword'); if (!choices.length) { document.getElementById('branchGateMessage').textContent = 'This account has no branch assigned. Contact the owner.'; return; } if (!canOpenBranch(id, password ? password.value : undefined)) { document.getElementById('branchGateMessage').textContent = 'Enter the correct branch password.'; return; } modal.remove(); resolve(id); };
+    });
   }
 
   async function showApprovals() {
@@ -142,8 +154,8 @@
   function readDashboard() { try { return branchStore || JSON.parse(localStorage.getItem(BRANCH_STORE_KEY) || '{}'); } catch (_) { return branchStore || {}; } }
   async function upload() { if (!syncReady) return; status('Saving to cloud...'); const result = await client.from(TABLE).upsert({ id: ROW_ID, payload: readDashboard() }, { onConflict: 'id' }); status(result.error ? 'Cloud sync needs attention' : isOwner() ? 'Cloud synced â€” tap for account approvals' : 'Cloud synced'); if (result.error) console.error('15M cloud sync:', result.error); }
   function scheduleUpload() { clearTimeout(timer); timer = setTimeout(upload, 450); }
-  async function loadCloud() { status('Loading secure records...'); const result = await client.from(TABLE).select('payload').eq('id', ROW_ID).maybeSingle(); if (result.error) { status('Cloud sync needs attention'); console.error('15M cloud load:', result.error); return; } branchStore = legacyBranchStore(result.data && result.data.payload); const removedCopies = removeCopiedBranchRecords(); const assignment = assignedBranch(); const openingBranch = isOwner() ? (branchStore.selectedBranchId || 'sta-rosa') : (assignment ? assignment.id : ''); if (!openingBranch || !activateBranch(openingBranch, false)) { status('Branch access is not available for this account.'); return; } if (typeof render === 'function') { try { render(); } catch (error) { console.warn('Cloud records loaded, but this screen needs a display refresh:', error); } } renderBranchControl(); syncReady = true; if (!result.data || !result.data.payload || !result.data.payload.__15mMultiBranch || removedCopies) await upload(); status(isOwner() ? 'Cloud synced â€” tap for account approvals' : 'Cloud synced'); }
-  async function acceptSession(session) { currentSession = session; if (!session) { syncReady = false; showSignIn('Sign in to use the shared records.'); return; } const approval = await client.from('user_approvals').select('status').eq('user_id', session.user.id).maybeSingle(); if (approval.error || !approval.data || approval.data.status !== 'approved') { showPending(approval.data); return; } removeModal('cloudSignIn'); removeModal('cloudPending'); const originalSave = typeof save === 'function' ? save : null; if (originalSave && !window.__15mCloudSaveWrapped) { window.__15mCloudSaveWrapped = true; save = function () { originalSave(); saveBranchStore(); scheduleUpload(); }; } await loadCloud(); }
+  async function loadCloud(openingBranch) { status('Loading secure records...'); const result = await client.from(TABLE).select('payload').eq('id', ROW_ID).maybeSingle(); if (result.error) { status('Cloud sync needs attention'); console.error('15M cloud load:', result.error); return; } branchStore = legacyBranchStore(result.data && result.data.payload); const removedCopies = removeCopiedBranchRecords(); if (!openingBranch || !activateBranch(openingBranch, false)) { status('Branch access is not available for this account.'); return; } if (typeof render === 'function') { try { render(); } catch (error) { console.warn('Cloud records loaded, but this screen needs a display refresh:', error); } } renderBranchControl(); syncReady = true; if (!result.data || !result.data.payload || !result.data.payload.__15mMultiBranch || removedCopies) await upload(); status(isOwner() ? 'Cloud synced â€” tap for account approvals' : 'Cloud synced'); }
+  async function acceptSession(session) { currentSession = session; if (!session) { syncReady = false; showSignIn('Sign in to use the shared records.'); return; } const approval = await client.from('user_approvals').select('status').eq('user_id', session.user.id).maybeSingle(); if (approval.error || !approval.data || approval.data.status !== 'approved') { showPending(approval.data); return; } const openingBranch = await chooseOpeningBranch(); const originalSave = typeof save === 'function' ? save : null; if (originalSave && !window.__15mCloudSaveWrapped) { window.__15mCloudSaveWrapped = true; save = function () { originalSave(); saveBranchStore(); scheduleUpload(); }; } await loadCloud(openingBranch); }
   async function begin() { addStyles(); applyBrandLogo(); protectDashboard(); const script = document.createElement('script'); script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'; script.onload = async function () { client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); const session = await client.auth.getSession(); await acceptSession(session.data.session); client.auth.onAuthStateChange(function (_event, nextSession) { setTimeout(function () { acceptSession(nextSession); }, 0); }); }; script.onerror = function () { status('Cloud sync library could not load'); }; document.head.appendChild(script); }
   begin();
   if (repairedLocalBranchStorage) setTimeout(function () { location.reload(); }, 50);
