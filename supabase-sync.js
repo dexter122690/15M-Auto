@@ -147,8 +147,7 @@
   function renderBranchControl() {
     if (!branchStore) return;
     let box = document.getElementById('branchControl');
-    if (!box) { box = document.createElement('div'); box.id = 'branchControl'; const tabs = document.querySelector('.tabs'); if (tabs && tabs.parentNode) tabs.parentNode.insertBefore(box, tabs.nextSibling); else document.body.appendChild(box); }
-    const selected = branchStore.selectedBranchId || 'sta-rosa';
+    if (!box) { box = document.createElement('div'); box.id = 'branchControl'; } const header = document.querySelector('header'); if (header && box.parentNode !== header) header.appendChild(box); else if (!box.parentNode) document.body.appendChild(box); const selected = branchStore.selectedBranchId || 'sta-rosa';
     const availableBranches = isOwner() ? branchStore.branches : branchStore.branches.filter(function (branch) { const assignment = assignedBranch(); return assignment && assignment.id === branch.id; });
     box.innerHTML = '<strong>Branch</strong><select id="branchSelect">' + availableBranches.map(function (branch) { return '<option value="' + branch.id + '"' + (branch.id === selected ? ' selected' : '') + '>' + branch.name + '</option>'; }).join('') + (isOwner() ? '<option value="all"' + (selected === 'all' ? ' selected' : '') + '>All branches (owner)</option>' : '') + '</select>' + (isOwner() ? '<button id="addBranchButton" type="button">+ Branch</button>' : '') + '<button id="logoutButton" type="button">Log out</button>';
     document.getElementById('branchSelect').onchange = function () { activateBranch(this.value, true); };
