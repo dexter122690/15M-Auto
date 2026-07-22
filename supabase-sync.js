@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 1.1 seconds
-Output:
 /* 15M Autocare cloud sync and owner-approved sign-in. */
 (function () {
   const SUPABASE_URL = 'https://nverrabdiqvwkevufbag.supabase.co';
