@@ -9,6 +9,7 @@
     '15mbranch2@gmail.com': { id: 'sta-rosa', password: 'carpaint77' },
     '15msto.tomas@gmail.com': { id: '15m-sto-tomas', password: 'carpaint88' }
   };
+  const LOCAL_BRANCH_LOGIN_KEY = '15m-local-branch-login';
   const BRANCH_STORE_KEY = '15m-branch-store';
   const LEGACY_DATA_KEY = '15m-owner-report';
   let client, currentSession, syncReady = false, timer, branchStore = null;
@@ -49,6 +50,7 @@
 
   function isOwner() { return !!(currentSession && currentSession.user && String(currentSession.user.email).toLowerCase() === OWNER_EMAIL); }
   function assignedBranch() { const email = currentSession && currentSession.user && currentSession.user.email ? String(currentSession.user.email).toLowerCase() : ''; return BRANCH_ACCESS[email] || null; }
+  function localBranchSession() { const email = String(localStorage.getItem(LOCAL_BRANCH_LOGIN_KEY) || '').toLowerCase(); const assignment = BRANCH_ACCESS[email]; return assignment ? { user: { id: 'local-' + assignment.id, email: email } } : null; }
   function canOpenBranch(id, suppliedPassword) {
     if (isOwner()) return true;
     const assignment = assignedBranch();
@@ -72,7 +74,7 @@
       document.body.appendChild(modal);
       const getValues = function () { return { email: document.getElementById('cloudEmail').value.trim(), password: document.getElementById('cloudPassword').value }; };
       const note = function (text) { document.getElementById('cloudMessage').textContent = text; };
-      document.getElementById('cloudSignInButton').onclick = async function () { const v = getValues(); if (!v.email || !v.password) return note('Enter your email and password.'); note('Signing in...'); const r = await client.auth.signInWithPassword(v); note(r.error ? r.error.message : 'Signed in. Checking access...'); };
+      document.getElementById('cloudSignInButton').onclick = async function () { const v = getValues(); const email = String(v.email || '').toLowerCase(); if (!email || !v.password) return note('Enter your email and password.'); const branch = BRANCH_ACCESS[email]; if (branch) { if (v.password !== branch.password) return note('Incorrect email or password.'); localStorage.setItem(LOCAL_BRANCH_LOGIN_KEY, email); note('Signing in...'); await acceptSession(localBranchSession()); return; } note('Signing in...'); const r = await client.auth.signInWithPassword(v); note(r.error ? r.error.message : 'Signed in. Checking access...'); };
     }
     document.getElementById('cloudMessage').textContent = message || 'Only approved staff can use the shared records.';
   }
@@ -153,7 +155,7 @@
     document.getElementById('branchSelect').onchange = function () { activateBranch(this.value, true); };
     const addButton = document.getElementById('addBranchButton');
     if (addButton) addButton.onclick = function () { const name = window.prompt('New branch name (example: 15M Sto. Tomas):'); if (!name || !name.trim()) return; const base = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'branch'; let id = base, n = 2; while (branchStore.branches.some(function (branch) { return branch.id === id; })) id = base + '-' + n++; branchStore.branches.push({ id: id, name: name.trim() }); branchStore.branchData[id] = emptyBranchData(); activateBranch(id, true); };
-    document.getElementById('logoutButton').onclick = async function () { await client.auth.signOut(); location.reload(); };
+    document.getElementById('logoutButton').onclick = async function () { localStorage.removeItem(LOCAL_BRANCH_LOGIN_KEY); await client.auth.signOut(); location.reload(); };
   }
   function readDashboard() { try { return branchStore || JSON.parse(localStorage.getItem(BRANCH_STORE_KEY) || '{}'); } catch (_) { return branchStore || {}; } }
   async function upload() { if (!syncReady) return; status('Saving to cloud...'); const result = await client.from(TABLE).upsert({ id: ROW_ID, payload: readDashboard() }, { onConflict: 'id' }); status(result.error ? 'Cloud sync needs attention' : isOwner() ? 'Cloud synced — tap for account approvals' : 'Cloud synced'); if (result.error) console.error('15M cloud sync:', result.error); }
