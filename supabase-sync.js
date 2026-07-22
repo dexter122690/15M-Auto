@@ -5,7 +5,23 @@
   const TABLE = 'dashboard_state';
   const ROW_ID = 1;
   const OWNER_EMAIL = 'dexterbsanagustin@gmail.com';
+  const BRANCH_STORE_KEY = '15m-branch-store';
+  const LEGACY_DATA_KEY = '15m-owner-report';
   let client, currentSession, syncReady = false, timer, branchStore = null;
+
+  // The main app expects this legacy key to contain only one branch's plain records.
+  // Move an older multi-branch value out of that key before the next page refresh.
+  function repairLocalBranchStorage() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LEGACY_DATA_KEY) || 'null');
+      if (!saved || !saved.__15mMultiBranch || !saved.branchData) return false;
+      const selected = saved.selectedBranchId && saved.selectedBranchId !== 'all' ? saved.selectedBranchId : 'sta-rosa';
+      localStorage.setItem(BRANCH_STORE_KEY, JSON.stringify(saved));
+      localStorage.setItem(LEGACY_DATA_KEY, JSON.stringify(saved.branchData[selected] || {}));
+      return true;
+    } catch (_) { return false; }
+  }
+  const repairedLocalBranchStorage = repairLocalBranchStorage();
 
   function addStyles() {
     if (document.getElementById('supabase-sync-style')) return;
@@ -75,13 +91,13 @@
     records.forEach(function (record) { Object.keys(record).forEach(function (key) { if (Array.isArray(record[key])) merged[key] = (merged[key] || []).concat(record[key]); else if (merged[key] === undefined) merged[key] = record[key]; }); });
     return merged;
   }
-  function saveBranchStore() { if (!branchStore) return; if (branchStore.selectedBranchId !== 'all') branchStore.branchData[branchStore.selectedBranchId] = data; localStorage.setItem('15m-owner-report', JSON.stringify(branchStore)); }
+  function saveBranchStore() { if (!branchStore) return; if (branchStore.selectedBranchId !== 'all') branchStore.branchData[branchStore.selectedBranchId] = data; localStorage.setItem(BRANCH_STORE_KEY, JSON.stringify(branchStore)); localStorage.setItem(LEGACY_DATA_KEY, JSON.stringify(data)); }
   function activateBranch(id, redraw) {
     if (!branchStore) return;
     branchStore.selectedBranchId = id;
     data = id === 'all' ? mergedBranchData() : (branchStore.branchData[id] || (branchStore.branchData[id] = {}));
     saveBranchStore();
-    if (redraw && typeof render === 'function') { try { render(); } catch (error) { console.warn('Branch switch display refresh could not finish:', error); } }
+    if (redraw) { const finish = syncReady ? upload() : Promise.resolve(); finish.finally(function () { location.reload(); }); return; }
     renderBranchControl();
   }
   function renderBranchControl() {
@@ -90,16 +106,17 @@
     if (!box) { box = document.createElement('div'); box.id = 'branchControl'; document.body.appendChild(box); }
     const selected = branchStore.selectedBranchId || 'sta-rosa';
     box.innerHTML = '<strong>Branch</strong><select id="branchSelect">' + branchStore.branches.map(function (branch) { return '<option value="' + branch.id + '"' + (branch.id === selected ? ' selected' : '') + '>' + branch.name + '</option>'; }).join('') + (isOwner() ? '<option value="all"' + (selected === 'all' ? ' selected' : '') + '>All branches (owner)</option>' : '') + '</select>' + (isOwner() ? '<button id="addBranchButton" type="button">+ Branch</button>' : '');
-    document.getElementById('branchSelect').onchange = function () { activateBranch(this.value, true); scheduleUpload(); };
+    document.getElementById('branchSelect').onchange = function () { activateBranch(this.value, true); };
     const addButton = document.getElementById('addBranchButton');
-    if (addButton) addButton.onclick = function () { const name = window.prompt('New branch name (example: 15M Sto. Tomas):'); if (!name || !name.trim()) return; const base = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'branch'; let id = base, n = 2; while (branchStore.branches.some(function (branch) { return branch.id === id; })) id = base + '-' + n++; branchStore.branches.push({ id: id, name: name.trim() }); branchStore.branchData[id] = {}; activateBranch(id, true); scheduleUpload(); };
+    if (addButton) addButton.onclick = function () { const name = window.prompt('New branch name (example: 15M Sto. Tomas):'); if (!name || !name.trim()) return; const base = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'branch'; let id = base, n = 2; while (branchStore.branches.some(function (branch) { return branch.id === id; })) id = base + '-' + n++; branchStore.branches.push({ id: id, name: name.trim() }); branchStore.branchData[id] = {}; activateBranch(id, true); };
   }
-  function readDashboard() { try { return branchStore || JSON.parse(localStorage.getItem('15m-owner-report') || '{}'); } catch (_) { return branchStore || {}; } }
+  function readDashboard() { try { return branchStore || JSON.parse(localStorage.getItem(BRANCH_STORE_KEY) || '{}'); } catch (_) { return branchStore || {}; } }
   async function upload() { if (!syncReady) return; status('Saving to cloud...'); const result = await client.from(TABLE).upsert({ id: ROW_ID, payload: readDashboard() }, { onConflict: 'id' }); status(result.error ? 'Cloud sync needs attention' : isOwner() ? 'Cloud synced â€” tap for account approvals' : 'Cloud synced'); if (result.error) console.error('15M cloud sync:', result.error); }
   function scheduleUpload() { clearTimeout(timer); timer = setTimeout(upload, 450); }
   async function loadCloud() { status('Loading secure records...'); const result = await client.from(TABLE).select('payload').eq('id', ROW_ID).maybeSingle(); if (result.error) { status('Cloud sync needs attention'); console.error('15M cloud load:', result.error); return; } branchStore = legacyBranchStore(result.data && result.data.payload); activateBranch(branchStore.selectedBranchId || 'sta-rosa', false); if (typeof render === 'function') { try { render(); } catch (error) { console.warn('Cloud records loaded, but this screen needs a display refresh:', error); } } renderBranchControl(); syncReady = true; if (!result.data || !result.data.payload || !result.data.payload.__15mMultiBranch) await upload(); status(isOwner() ? 'Cloud synced â€” tap for account approvals' : 'Cloud synced'); }
   async function acceptSession(session) { currentSession = session; if (!session) { syncReady = false; showSignIn('Sign in to use the shared records.'); return; } const approval = await client.from('user_approvals').select('status').eq('user_id', session.user.id).maybeSingle(); if (approval.error || !approval.data || approval.data.status !== 'approved') { showPending(approval.data); return; } removeModal('cloudSignIn'); removeModal('cloudPending'); const originalSave = typeof save === 'function' ? save : null; if (originalSave && !window.__15mCloudSaveWrapped) { window.__15mCloudSaveWrapped = true; save = function () { originalSave(); saveBranchStore(); scheduleUpload(); }; } await loadCloud(); }
   async function begin() { addStyles(); applyBrandLogo(); protectDashboard(); const script = document.createElement('script'); script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'; script.onload = async function () { client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); const session = await client.auth.getSession(); await acceptSession(session.data.session); client.auth.onAuthStateChange(function (_event, nextSession) { setTimeout(function () { acceptSession(nextSession); }, 0); }); }; script.onerror = function () { status('Cloud sync library could not load'); }; document.head.appendChild(script); }
   begin();
+  if (repairedLocalBranchStorage) setTimeout(function () { location.reload(); }, 50);
 }());
 
