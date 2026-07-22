@@ -131,6 +131,31 @@
     return merged;
   }
   function emptyBranchData() { return { invoices: [], expenses: [], feedback: [], pettyCash: [], cibManual: [], employees: [], payroll: [], imports: {} }; }
+  function clearStoTomasLocalCopy() {
+    try {
+      const stored = legacyBranchStore(JSON.parse(localStorage.getItem(BRANCH_STORE_KEY) || 'null'));
+      if (!stored.branches.some(function (branch) { return branch.id === '15m-sto-tomas'; })) stored.branches.push({ id: '15m-sto-tomas', name: '15M Sto. Tomas' });
+      stored.branchData['15m-sto-tomas'] = emptyBranchData();
+      stored.selectedBranchId = '15m-sto-tomas';
+      localStorage.setItem(BRANCH_STORE_KEY, JSON.stringify(stored));
+      localStorage.setItem(LEGACY_DATA_KEY, JSON.stringify(emptyBranchData()));
+      if (typeof data !== 'undefined') data = emptyBranchData();
+    } catch (_) {}
+  }
+  function repairDisplayText() {
+    const replacements = { 'â‚±': '₱', 'â€”': '—', 'â€“': '–', 'â€™': "'", 'â€œ': '"', 'â€': '"', 'Â ': ' ' };
+    const fix = function () {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        let text = node.nodeValue, repaired = text;
+        Object.keys(replacements).forEach(function (bad) { repaired = repaired.split(bad).join(replacements[bad]); });
+        if (repaired !== text) node.nodeValue = repaired;
+      }
+    };
+    fix();
+    new MutationObserver(fix).observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
   function removeCopiedBranchRecords() {
     if (!branchStore || !branchStore.branchData || !branchStore.branchData['sta-rosa']) return false;
     const staRosa = JSON.stringify(branchStore.branchData['sta-rosa']);
@@ -145,7 +170,7 @@
     if (!branchStore) return false;
     if (!canOpenBranch(id)) return false;
     branchStore.selectedBranchId = id;
-    data = id === 'all' ? mergedBranchData() : (branchStore.branchData[id] || (branchStore.branchData[id] = {}));
+    data = id === 'all' ? mergedBranchData() : (branchStore.branchData[id] && Object.keys(branchStore.branchData[id]).length ? branchStore.branchData[id] : (branchStore.branchData[id] = emptyBranchData()));
     saveBranchStore();
     if (redraw) { const finish = syncReady ? upload() : Promise.resolve(); finish.finally(function () { location.reload(); }); return true; }
     renderBranchControl();
@@ -167,8 +192,8 @@
   async function upload() { if (!syncReady) return; status('Saving to cloud...'); const result = await client.from(TABLE).upsert({ id: ROW_ID, payload: readDashboard() }, { onConflict: 'id' }); status(result.error ? 'Cloud sync needs attention' : isOwner() ? 'Cloud synced — tap for account approvals' : 'Cloud synced'); if (result.error) console.error('15M cloud sync:', result.error); }
   function scheduleUpload() { clearTimeout(timer); timer = setTimeout(upload, 450); }
   async function loadCloud(openingBranch) { status('Loading secure records...'); const result = await client.from(TABLE).select('payload').eq('id', ROW_ID).maybeSingle(); if (result.error) { status('Cloud sync needs attention'); console.error('15M cloud load:', result.error); return; } branchStore = legacyBranchStore(result.data && result.data.payload); const removedCopies = removeCopiedBranchRecords(); if (!openingBranch || !activateBranch(openingBranch, false)) { status('Branch access is not available for this account.'); return; } if (typeof render === 'function') { try { render(); } catch (error) { console.warn('Cloud records loaded, but this screen needs a display refresh:', error); } } renderBranchControl(); syncReady = true; if (!result.data || !result.data.payload || !result.data.payload.__15mMultiBranch || removedCopies) await upload(); status(isOwner() ? 'Cloud synced — tap for account approvals' : 'Cloud synced'); }
-  async function acceptSession(session) { currentSession = session; if (!session) { syncReady = false; showSignIn('Sign in to use the shared records.'); return; } const directBranch = assignedBranch(); const isDirectBranch = !!(directBranch && String(session.user.id || '').indexOf('local-') === 0); const approval = isDirectBranch ? { data: { status: 'approved' } } : await client.from('user_approvals').select('status').eq('user_id', session.user.id).maybeSingle(); if (!isOwner() && !assignedBranch() && (approval.error || !approval.data || approval.data.status !== 'approved')) { showPending(approval.data); return; } if (isDirectBranch) removeModal('cloudSignIn'); const openingBranch = isDirectBranch ? directBranch.id : await chooseOpeningBranch(); const originalSave = typeof save === 'function' ? save : null; if (originalSave && !window.__15mCloudSaveWrapped) { window.__15mCloudSaveWrapped = true; save = function () { originalSave(); saveBranchStore(); scheduleUpload(); }; } await loadCloud(openingBranch); }
-  async function begin() { addStyles(); applyBrandLogo(); protectDashboard(); const script = document.createElement('script'); script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'; script.onload = async function () { client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); const localSession = localBranchSession(); const session = localSession || (await client.auth.getSession()).data.session; await acceptSession(session); client.auth.onAuthStateChange(function (_event, nextSession) { setTimeout(function () { acceptSession(nextSession); }, 0); }); }; script.onerror = function () { status('Cloud sync library could not load'); }; document.head.appendChild(script); }
+  async function acceptSession(session) { currentSession = session; if (!session) { syncReady = false; showSignIn('Sign in to use the shared records.'); return; } const directBranch = assignedBranch(); const isDirectBranch = !!(directBranch && String(session.user.id || '').indexOf('local-') === 0); const approval = isDirectBranch ? { data: { status: 'approved' } } : await client.from('user_approvals').select('status').eq('user_id', session.user.id).maybeSingle(); if (!isOwner() && !assignedBranch() && (approval.error || !approval.data || approval.data.status !== 'approved')) { showPending(approval.data); return; } if (isDirectBranch) { removeModal('cloudSignIn'); clearStoTomasLocalCopy(); } const openingBranch = isDirectBranch ? directBranch.id : await chooseOpeningBranch(); const originalSave = typeof save === 'function' ? save : null; if (originalSave && !window.__15mCloudSaveWrapped) { window.__15mCloudSaveWrapped = true; save = function () { originalSave(); saveBranchStore(); scheduleUpload(); }; } await loadCloud(openingBranch); }
+  async function begin() { addStyles(); applyBrandLogo(); repairDisplayText(); protectDashboard(); const script = document.createElement('script'); script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'; script.onload = async function () { client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); const localSession = localBranchSession(); const session = localSession || (await client.auth.getSession()).data.session; await acceptSession(session); client.auth.onAuthStateChange(function (_event, nextSession) { setTimeout(function () { acceptSession(nextSession); }, 0); }); }; script.onerror = function () { status('Cloud sync library could not load'); }; document.head.appendChild(script); }
   begin();
   if (repairedLocalBranchStorage) setTimeout(function () { location.reload(); }, 50);
 }());
