@@ -1,168 +1,74 @@
-/* 15M Autocare cloud sync - loaded after the dashboard application. */
+/* 15M Autocare cloud sync and owner-approved sign-in. */
 (function () {
   const SUPABASE_URL = 'https://nverrabdiqvwkevufbag.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_g7F7q0quFV3t84VOilAayg_uv3FtKgv';
   const TABLE = 'dashboard_state';
   const ROW_ID = 1;
-  let client;
-  let syncReady = false;
-  let timer;
+  const OWNER_EMAIL = 'dexterbsanagustin@gmail.com';
+  let client, currentSession, syncReady = false, timer;
 
   function addStyles() {
     if (document.getElementById('supabase-sync-style')) return;
     const style = document.createElement('style');
     style.id = 'supabase-sync-style';
     style.textContent = `
-      #cloudSignIn{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(0,0,0,.72);padding:20px;font-family:Arial,sans-serif}
-      #cloudSignIn .cloud-card{width:min(430px,100%);background:#fffaf7;border:2px solid #ff5a16;border-radius:18px;padding:28px;color:#24130c;box-shadow:0 20px 60px rgba(0,0,0,.45)}
-      #cloudSignIn h2{margin:0 0 8px;color:#e64a0c}.cloud-card p{line-height:1.45}.cloud-card input{box-sizing:border-box;width:100%;padding:12px;border:1px solid #d9c9bf;border-radius:9px;margin:10px 0;font-size:15px}.cloud-card button{width:100%;padding:12px;border:0;border-radius:9px;background:#ff5a16;color:#fff;font-weight:700;cursor:pointer}.cloud-card .cloud-secondary{margin-top:9px;background:transparent;color:#5c3522;border:1px solid #cbb7ab}.cloud-card small{display:block;margin-top:12px;color:#765}
-      #cloudStatus{position:fixed;right:14px;bottom:14px;z-index:9990;background:#151515;color:#fff;padding:8px 11px;border-radius:999px;font:12px Arial,sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.25)}
+      .cloud-overlay{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(0,0,0,.72);padding:20px;font-family:Arial,sans-serif}
+      .cloud-card{width:min(440px,100%);background:#fffaf7;border:2px solid #ff5a16;border-radius:18px;padding:28px;color:#24130c;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+      .cloud-card h2{margin:0 0 8px;color:#e64a0c}.cloud-card p{line-height:1.45}.cloud-card input{box-sizing:border-box;width:100%;padding:12px;border:1px solid #d9c9bf;border-radius:9px;margin:6px 0;font-size:15px}.cloud-card label{font-size:12px;font-weight:700;display:block;margin-top:9px}.cloud-card button{width:100%;padding:12px;border:0;border-radius:9px;background:#ff5a16;color:#fff;font-weight:700;cursor:pointer;margin-top:9px}.cloud-card .cloud-secondary{background:transparent;color:#5c3522;border:1px solid #cbb7ab}.cloud-card small{display:block;margin-top:12px;color:#765;line-height:1.35}.cloud-card hr{border:0;border-top:1px solid #e8d9d1;margin:18px 0}.cloud-card .cloud-user{background:#fff1e8;padding:10px;border-radius:8px;margin:8px 0}.cloud-card .cloud-row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eadbd2}.cloud-card .cloud-row button{width:auto;padding:8px 11px;margin:0}.cloud-card .cloud-row .decline{background:#6d4c41}
+      #cloudStatus{position:fixed;right:14px;bottom:14px;z-index:9990;background:#151515;color:#fff;padding:8px 11px;border-radius:999px;font:12px Arial,sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.25);cursor:pointer}
     `;
     document.head.appendChild(style);
   }
 
-  function status(message) {
-    let el = document.getElementById('cloudStatus');
-    if (!el) { el = document.createElement('div'); el.id = 'cloudStatus'; document.body.appendChild(el); }
-    el.textContent = message;
-    el.onclick = function () { showSignIn('Sign in whenever you are ready to sync this device.'); };
-  }
+  function isOwner() { return !!(currentSession && currentSession.user && String(currentSession.user.email).toLowerCase() === OWNER_EMAIL); }
+  function removeModal(id) { const el = document.getElementById(id); if (el) el.remove(); }
+  function status(message) { let el = document.getElementById('cloudStatus'); if (!el) { el = document.createElement('div'); el.id = 'cloudStatus'; document.body.appendChild(el); } el.textContent = message; el.onclick = function () { isOwner() ? showApprovals() : showSignIn(); }; }
 
   function showSignIn(message) {
-    addStyles();
+    addStyles(); removeModal('cloudPending'); removeModal('cloudApprovals');
     let modal = document.getElementById('cloudSignIn');
     if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'cloudSignIn';
-      modal.innerHTML = `<div class="cloud-card"><h2>15M Secure Cloud</h2><p>Sign in with your work email to securely sync the business records across devices. You can also continue using the dashboard now and set up sync later.</p><input id="cloudEmail" type="email" placeholder="Work email address" autocomplete="email"><button id="cloudSendLink" type="button">Send secure sign-in link</button><button id="cloudContinue" class="cloud-secondary" type="button">Continue without cloud sync</button><small id="cloudMessage"></small></div>`;
+      modal = document.createElement('div'); modal.id = 'cloudSignIn'; modal.className = 'cloud-overlay';
+      modal.innerHTML = `<div class="cloud-card"><h2>15M Secure Access</h2><p>Sign in to use the 15M Autocare business records. New accounts need owner approval before they can open the system.</p><label>Email address</label><input id="cloudEmail" type="email" placeholder="you@example.com" autocomplete="email"><label>Password</label><input id="cloudPassword" type="password" placeholder="At least 6 characters" autocomplete="current-password"><button id="cloudSignInButton" type="button">Sign in</button><button id="cloudSignUpButton" class="cloud-secondary" type="button">Create a new account</button><hr><button id="cloudLinkButton" class="cloud-secondary" type="button">Email me a sign-in link instead</button><small id="cloudMessage"></small></div>`;
       document.body.appendChild(modal);
-      document.getElementById('cloudSendLink').addEventListener('click', async function () {
-        const email = document.getElementById('cloudEmail').value.trim();
-        const messageEl = document.getElementById('cloudMessage');
-        if (!email) { messageEl.textContent = 'Enter your email address first.'; return; }
-        this.disabled = true;
-        messageEl.textContent = 'Sending your secure sign-in link...';
-        const result = await client.auth.signInWithOtp({ email: email, options: { emailRedirectTo: location.origin + location.pathname } });
-        this.disabled = false;
-        messageEl.textContent = result.error ? result.error.message : 'Check your email and open the secure sign-in link.';
-      });
-      document.getElementById('cloudContinue').addEventListener('click', function () {
-        modal.remove();
-        status('Using this device only - tap here to set up cloud sync');
-      });
+      const getValues = function () { return { email: document.getElementById('cloudEmail').value.trim(), password: document.getElementById('cloudPassword').value }; };
+      const note = function (text) { document.getElementById('cloudMessage').textContent = text; };
+      document.getElementById('cloudSignInButton').onclick = async function () { const v = getValues(); if (!v.email || !v.password) return note('Enter your email and password.'); note('Signing in...'); const r = await client.auth.signInWithPassword(v); note(r.error ? r.error.message : 'Signed in. Checking access...'); };
+      document.getElementById('cloudSignUpButton').onclick = async function () { const v = getValues(); if (!v.email || v.password.length < 6) return note('Enter your email and a password with at least 6 characters.'); note('Creating your account...'); const r = await client.auth.signUp({ email: v.email, password: v.password, options: { emailRedirectTo: location.origin + location.pathname } }); note(r.error ? r.error.message : 'Account created. Check your email to confirm it, then wait for owner approval.'); };
+      document.getElementById('cloudLinkButton').onclick = async function () { const v = getValues(); if (!v.email) return note('Enter your email address first.'); note('Sending your sign-in link...'); const r = await client.auth.signInWithOtp({ email: v.email, options: { emailRedirectTo: location.origin + location.pathname } }); note(r.error ? r.error.message : 'Check your email and open the sign-in link.'); };
     }
-    document.getElementById('cloudMessage').textContent = message || 'Your records remain protected until you sign in.';
+    document.getElementById('cloudMessage').textContent = message || 'Only approved staff can use the shared records.';
   }
 
-  function hideSignIn() { const modal = document.getElementById('cloudSignIn'); if (modal) modal.remove(); }
-
-  function applyBrandLogo() {
-    const logoPath = 'new%20logo%2015m.png';
-    const setLogo = function () {
-      document.querySelectorAll('.logo, img[alt="15M Autocare logo"], img[src="15m-autocare-logo.png"]').forEach(function (image) {
-        if (image.getAttribute('src') !== logoPath) image.src = logoPath;
-      });
-    };
-    setLogo();
-    new MutationObserver(setLogo).observe(document.body, { childList: true, subtree: true });
+  function showPending(approval) {
+    addStyles(); removeModal('cloudSignIn'); removeModal('cloudApprovals');
+    let modal = document.getElementById('cloudPending');
+    if (!modal) { modal = document.createElement('div'); modal.id = 'cloudPending'; modal.className = 'cloud-overlay'; document.body.appendChild(modal); }
+    const rejected = approval && approval.status === 'rejected';
+    modal.innerHTML = `<div class="cloud-card"><h2>${rejected ? 'Access not approved' : 'Approval needed'}</h2><p>${rejected ? 'This account was not approved. Please contact the 15M owner if you believe this is a mistake.' : 'Your account is ready, but the owner must approve it before you can view the business records.'}</p><small>Signed in as ${currentSession && currentSession.user.email ? currentSession.user.email : ''}</small><button id="cloudSignOut" class="cloud-secondary" type="button">Sign out</button></div>`;
+    document.getElementById('cloudSignOut').onclick = function () { client.auth.signOut(); removeModal('cloudPending'); showSignIn('You have signed out.'); };
   }
 
-  function protectDashboard() {
-    const dashboardButton = Array.from(document.querySelectorAll('.tabs button')).find(function (button) {
-      return button.textContent.trim() === 'Dashboard';
-    });
-    const invoiceButton = Array.from(document.querySelectorAll('.tabs button')).find(function (button) {
-      return button.textContent.trim() === 'Invoice Making';
-    });
-    const dashboard = document.getElementById('dashboard');
-    if (!dashboardButton || !dashboard) return;
-
-    const activate = function (id, button) {
-      document.querySelectorAll('.tab').forEach(function (section) { section.classList.remove('active'); });
-      document.querySelectorAll('.tabs button').forEach(function (tabButton) { tabButton.classList.remove('active'); });
-      document.getElementById(id).classList.add('active');
-      button.classList.add('active');
-      window.scrollTo(0, 0);
-    };
-
-    const openDashboard = function () {
-      const entered = window.prompt('Enter dashboard passcode:');
-      if (entered === '002626') {
-        sessionStorage.setItem('15m-dashboard-unlocked', 'yes');
-        activate('dashboard', dashboardButton);
-      } else if (entered !== null) {
-        window.alert('Incorrect passcode.');
-      }
-    };
-
-    dashboardButton.addEventListener('click', function (event) {
-      if (sessionStorage.getItem('15m-dashboard-unlocked') === 'yes') return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      openDashboard();
-    }, true);
-
-    if (sessionStorage.getItem('15m-dashboard-unlocked') !== 'yes' && dashboard.classList.contains('active') && invoiceButton) {
-      activate('invoices', invoiceButton);
-    }
+  async function showApprovals() {
+    if (!isOwner()) return showSignIn('Only the owner can review account requests.');
+    addStyles(); removeModal('cloudSignIn'); removeModal('cloudPending');
+    let modal = document.getElementById('cloudApprovals');
+    if (!modal) { modal = document.createElement('div'); modal.id = 'cloudApprovals'; modal.className = 'cloud-overlay'; document.body.appendChild(modal); }
+    modal.innerHTML = `<div class="cloud-card"><h2>Account approvals</h2><p>Loading new account requests...</p></div>`;
+    const result = await client.from('user_approvals').select('user_id,email,status,created_at').eq('status','pending').order('created_at',{ascending:true});
+    const rows = result.data || [];
+    modal.innerHTML = `<div class="cloud-card"><h2>Account approvals</h2><p>${rows.length ? 'Choose who can use the shared 15M records.' : 'There are no pending account requests.'}</p><div id="approvalRows">${rows.map(function (r) { return `<div class="cloud-row"><span><b>${r.email}</b><br><small>Requested ${new Date(r.created_at).toLocaleDateString()}</small></span><span><button data-approve="${r.user_id}">Approve</button><button class="decline" data-reject="${r.user_id}">Decline</button></span></div>`; }).join('')}</div><button id="closeApprovals" class="cloud-secondary" type="button">Close</button><small id="approvalMessage"></small></div>`;
+    document.getElementById('closeApprovals').onclick = function () { removeModal('cloudApprovals'); };
+    modal.querySelectorAll('[data-approve],[data-reject]').forEach(function (button) { button.onclick = async function () { const statusValue = this.dataset.approve ? 'approved' : 'rejected'; const id = this.dataset.approve || this.dataset.reject; const r = await client.from('user_approvals').update({ status: statusValue, reviewed_at: new Date().toISOString(), reviewed_by: currentSession.user.id }).eq('user_id', id); document.getElementById('approvalMessage').textContent = r.error ? r.error.message : 'Account ' + statusValue + '.'; if (!r.error) showApprovals(); }; });
   }
 
-  function readDashboard() {
-    try { return JSON.parse(localStorage.getItem('15m-owner-report') || '{}'); }
-    catch (_) { return {}; }
-  }
-
-  async function upload() {
-    if (!syncReady) return;
-    status('Saving to cloud...');
-    const payload = readDashboard();
-    const result = await client.from(TABLE).upsert({ id: ROW_ID, payload: payload }, { onConflict: 'id' });
-    status(result.error ? 'Cloud sync needs attention' : 'Cloud synced');
-    if (result.error) console.error('15M cloud sync:', result.error);
-  }
-
+  function applyBrandLogo() { const logoPath = 'new%20logo%2015m.png'; const setLogo = function () { document.querySelectorAll('.logo, img[alt="15M Autocare logo"], img[src="15m-autocare-logo.png"]').forEach(function (image) { if (image.getAttribute('src') !== logoPath) image.src = logoPath; }); }; setLogo(); new MutationObserver(setLogo).observe(document.body, { childList: true, subtree: true }); }
+  function protectDashboard() { const dashboardButton = Array.from(document.querySelectorAll('.tabs button')).find(function (button) { return button.textContent.trim() === 'Dashboard'; }); const invoiceButton = Array.from(document.querySelectorAll('.tabs button')).find(function (button) { return button.textContent.trim() === 'Invoice Making'; }); const dashboard = document.getElementById('dashboard'); if (!dashboardButton || !dashboard) return; const activate = function (id, button) { document.querySelectorAll('.tab').forEach(function (section) { section.classList.remove('active'); }); document.querySelectorAll('.tabs button').forEach(function (tabButton) { tabButton.classList.remove('active'); }); document.getElementById(id).classList.add('active'); button.classList.add('active'); window.scrollTo(0, 0); }; const openDashboard = function () { const entered = window.prompt('Enter dashboard passcode:'); if (entered === '002626') { sessionStorage.setItem('15m-dashboard-unlocked', 'yes'); activate('dashboard', dashboardButton); } else if (entered !== null) window.alert('Incorrect passcode.'); }; dashboardButton.addEventListener('click', function (event) { if (sessionStorage.getItem('15m-dashboard-unlocked') === 'yes') return; event.preventDefault(); event.stopImmediatePropagation(); openDashboard(); }, true); if (sessionStorage.getItem('15m-dashboard-unlocked') !== 'yes' && dashboard.classList.contains('active') && invoiceButton) activate('invoices', invoiceButton); }
+  function readDashboard() { try { return JSON.parse(localStorage.getItem('15m-owner-report') || '{}'); } catch (_) { return {}; } }
+  async function upload() { if (!syncReady) return; status('Saving to cloud...'); const result = await client.from(TABLE).upsert({ id: ROW_ID, payload: readDashboard() }, { onConflict: 'id' }); status(result.error ? 'Cloud sync needs attention' : isOwner() ? 'Cloud synced — tap for account approvals' : 'Cloud synced'); if (result.error) console.error('15M cloud sync:', result.error); }
   function scheduleUpload() { clearTimeout(timer); timer = setTimeout(upload, 450); }
-
-  async function loadCloud() {
-    status('Loading secure records...');
-    const result = await client.from(TABLE).select('payload').eq('id', ROW_ID).maybeSingle();
-    if (result.error) { status('Cloud sync needs attention'); console.error('15M cloud load:', result.error); return; }
-    if (result.data && result.data.payload && Object.keys(result.data.payload).length) {
-      data = result.data.payload;
-      localStorage.setItem('15m-owner-report', JSON.stringify(data));
-      if (typeof render === 'function') render();
-    } else {
-      syncReady = true;
-      await upload();
-      return;
-    }
-    syncReady = true;
-    status('Cloud synced');
-  }
-
-  async function begin() {
-    addStyles();
-    applyBrandLogo();
-    protectDashboard();
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-    script.onload = async function () {
-      client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      const session = await client.auth.getSession();
-      if (!session.data.session) { showSignIn(); return; }
-      hideSignIn();
-      const originalSave = typeof save === 'function' ? save : null;
-      if (originalSave) {
-        save = function () { originalSave(); scheduleUpload(); };
-      }
-      await loadCloud();
-      client.auth.onAuthStateChange(function (_event, nextSession) {
-        if (!nextSession) { syncReady = false; showSignIn('Please sign in again to continue syncing.'); }
-      });
-    };
-    script.onerror = function () { status('Cloud sync library could not load'); };
-    document.head.appendChild(script);
-  }
-
+  async function loadCloud() { status('Loading secure records...'); const result = await client.from(TABLE).select('payload').eq('id', ROW_ID).maybeSingle(); if (result.error) { status('Cloud sync needs attention'); console.error('15M cloud load:', result.error); return; } if (result.data && result.data.payload && Object.keys(result.data.payload).length) { data = result.data.payload; localStorage.setItem('15m-owner-report', JSON.stringify(data)); if (typeof render === 'function') render(); } else { syncReady = true; await upload(); return; } syncReady = true; status(isOwner() ? 'Cloud synced — tap for account approvals' : 'Cloud synced'); }
+  async function acceptSession(session) { currentSession = session; if (!session) { syncReady = false; showSignIn('Sign in to use the shared records.'); return; } const approval = await client.from('user_approvals').select('status').eq('user_id', session.user.id).maybeSingle(); if (approval.error || !approval.data || approval.data.status !== 'approved') { showPending(approval.data); return; } removeModal('cloudSignIn'); removeModal('cloudPending'); const originalSave = typeof save === 'function' ? save : null; if (originalSave && !window.__15mCloudSaveWrapped) { window.__15mCloudSaveWrapped = true; save = function () { originalSave(); scheduleUpload(); }; } await loadCloud(); }
+  async function begin() { addStyles(); applyBrandLogo(); protectDashboard(); const script = document.createElement('script'); script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'; script.onload = async function () { client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); const session = await client.auth.getSession(); await acceptSession(session.data.session); client.auth.onAuthStateChange(function (_event, nextSession) { setTimeout(function () { acceptSession(nextSession); }, 0); }); }; script.onerror = function () { status('Cloud sync library could not load'); }; document.head.appendChild(script); }
   begin();
 }());
