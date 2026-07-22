@@ -39,6 +39,10 @@
       #cloudSignIn .cloud-brand img{clip-path:circle(50% at 50% 50%)}
       #cloudStatus{position:fixed;right:14px;bottom:14px;z-index:9990;background:#151515;color:#fff;padding:8px 11px;border-radius:999px;font:12px Arial,sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.25);cursor:pointer}
       #branchControl{position:relative;z-index:2;display:flex;gap:7px;align-items:center;width:fit-content;max-width:calc(100% - 32px);margin:8px 16px 2px auto;background:#fffaf7;border:1px solid #e7cabd;border-radius:10px;padding:8px 10px;box-shadow:0 3px 12px rgba(0,0,0,.14);font:12px Arial,sans-serif;color:#4d291b}#branchControl strong{white-space:nowrap}#branchControl select{max-width:170px;padding:6px;border:1px solid #d8bfb3;border-radius:6px;background:#fff}#branchControl button{padding:6px 8px;border:0;border-radius:6px;background:#ff5a16;color:#fff;font-weight:700;cursor:pointer}#branchControl #logoutButton{background:#4d291b}@media(max-width:680px){#branchControl{width:auto;margin:7px 12px;justify-content:flex-start;flex-wrap:wrap}#branchControl select{flex:1;min-width:145px;max-width:none}}
+      header{position:relative;padding-right:340px}
+#branchControl{position:absolute;top:50%;right:max(18px,5vw);transform:translateY(-50%);z-index:5;margin:0;background:transparent;border:0;box-shadow:none;color:#fff;padding:0}
+#branchControl select{background:#fff}
+@media(max-width:760px){header{padding-right:max(18px,5vw);padding-bottom:66px}#branchControl{top:auto;right:max(18px,5vw);bottom:9px;transform:none;width:auto;margin:0;justify-content:flex-end}#branchControl select{min-width:145px;max-width:180px}}
     `;
     document.head.appendChild(style);
   }
