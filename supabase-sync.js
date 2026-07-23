@@ -67,9 +67,30 @@
       modal = document.createElement('div'); modal.id = 'cloudSignIn'; modal.className = 'cloud-overlay';
       modal.innerHTML = `<div class="cloud-card"><section class="cloud-brand"><img src="new%20logo%2015m.png" alt="15M Autocare"><h1>Manage your branch.<br><span>Protect your records.</span></h1><p>Secure invoicing, sales, expenses, cash control, and payroll for 15M Autocare Services.</p></section><section class="cloud-form"><div class="cloud-form-inner"><h2>Sign in to 15M</h2><p>Use your branch email and password to continue.</p><label>Branch</label><select id="cloudBranch"><option value="">Choose your branch</option><option value="15mbranch2@gmail.com">15M Sta. Rosa</option><option value="15msto.tomas@gmail.com">15M Sto. Tomas</option><option value="owner">Owner / Admin</option></select><small class="branch-hint">Choose a branch to use its assigned email.</small><label>Email address</label><input id="cloudEmail" type="email" placeholder="Choose a branch first" autocomplete="email" readonly><label>Password</label><input id="cloudPassword" type="password" placeholder="Enter your password" autocomplete="current-password"><button id="cloudSignInButton" type="button">Sign in</button><small id="cloudMessage"></small></div></section></div>`;
       document.body.appendChild(modal);
-      const getValues = function () { return { email: document.getElementById('cloudEmail').value.trim(), password: document.getElementById('cloudPassword').value }; };
+      const branchPicker = document.getElementById('cloudBranch');
+      const emailField = document.getElementById('cloudEmail');
+      const getValues = function () { return { branch: branchPicker.value, email: emailField.value.trim(), password: document.getElementById('cloudPassword').value }; };
       const note = function (text) { document.getElementById('cloudMessage').textContent = text; };
-      document.getElementById('cloudSignInButton').onclick = async function () { const v = getValues(); const email = String(v.email || '').toLowerCase(); if (!email || !v.password) return note('Enter your email and password.'); const branch = BRANCH_ACCESS[email]; if (branch && v.password !== branch.password) return note('Incorrect email or password.'); note('Signing in...'); const r = await client.auth.signInWithPassword({ email: email, password: v.password }); note(r.error ? 'Unable to sign in. Check the branch email and password.' : 'Signed in. Loading your branch records...'); };
+      branchPicker.onchange = function () {
+        const email = this.value;
+        const isBranch = !!BRANCH_ACCESS[email];
+        emailField.value = isBranch ? email : '';
+        emailField.readOnly = isBranch || !email;
+        emailField.placeholder = isBranch ? 'Assigned branch email' : (email === 'owner' ? 'Owner email address' : 'Choose a branch first');
+        document.getElementById('cloudPassword').focus();
+      };
+      document.getElementById('cloudSignInButton').onclick = async function () {
+        const v = getValues();
+        const email = String(v.email || '').toLowerCase();
+        if (!v.branch) return note('Choose the branch you need to open.');
+        if (!email || !v.password) return note('Enter the password for this branch.');
+        if (v.branch !== 'owner' && email !== v.branch) return note('Use the email assigned to the selected branch.');
+        const branch = BRANCH_ACCESS[email];
+        if (branch && v.password !== branch.password) return note('Incorrect branch password.');
+        note('Signing in...');
+        const r = await client.auth.signInWithPassword({ email: email, password: v.password });
+        note(r.error ? 'Unable to sign in. Check the selected branch and password.' : 'Signed in. Loading your branch records...');
+      };
     }
     document.getElementById('cloudMessage').textContent = message || 'Only approved staff can use the shared records.';
   }
