@@ -41,7 +41,7 @@
       #cloudSignIn{padding:0;background:#0d0f12}#cloudSignIn .cloud-card{width:100%;height:100%;max-width:none;border:0;border-radius:0;padding:0;display:grid;grid-template-columns:1.15fr .85fr;background:#18191d;color:#fff;box-shadow:none}#cloudSignIn .cloud-brand{position:relative;overflow:hidden;padding:clamp(36px,7vw,96px);display:flex;flex-direction:column;justify-content:center;background:radial-gradient(circle at 25% 20%,#482111 0,transparent 31%),linear-gradient(135deg,#080a0c,#171114)}#cloudSignIn .cloud-brand:after{content:'';position:absolute;width:430px;height:430px;border:42px solid #ff5a16;border-radius:50%;right:-190px;bottom:-230px;opacity:.25}#cloudSignIn .cloud-brand img{width:92px;height:92px;object-fit:contain;margin-bottom:42px;z-index:1}#cloudSignIn .cloud-brand h1{font-size:clamp(38px,5vw,70px);line-height:1.06;margin:0;max-width:700px;z-index:1}#cloudSignIn .cloud-brand h1 span{color:#ff5a16}#cloudSignIn .cloud-brand p{font-size:17px;color:#ddd;max-width:500px;z-index:1}#cloudSignIn .cloud-form{display:flex;align-items:center;justify-content:center;padding:40px;background:#1c1d21}#cloudSignIn .cloud-form-inner{width:min(420px,100%)}#cloudSignIn .cloud-form h2{color:#fff;font-size:28px;margin:0 0 8px}#cloudSignIn .cloud-form p{color:#b9b9bd;margin:0 0 22px}#cloudSignIn .cloud-form label{color:#ddd;font-size:13px}#cloudSignIn .cloud-form input,#cloudSignIn .cloud-form select{background:#25262b;border-color:#56575e;color:#fff;border-radius:12px;padding:15px}#cloudSignIn .cloud-form input[readonly]{opacity:.78;cursor:not-allowed}#cloudSignIn .branch-hint{margin:2px 0 9px;color:#aaa}#cloudSignIn .cloud-form button{border-radius:12px;padding:15px;background:#ff5a16;font-size:16px}#cloudSignIn .cloud-form .cloud-secondary{color:#fff;border-color:#55565c;background:transparent}#cloudSignIn .cloud-form small{color:#bdbdc2}@media(max-width:760px){#cloudSignIn .cloud-card{display:block;overflow:auto}#cloudSignIn .cloud-brand{padding:34px 28px;min-height:205px}#cloudSignIn .cloud-brand img{width:62px;height:62px;margin-bottom:18px}#cloudSignIn .cloud-brand h1{font-size:34px}#cloudSignIn .cloud-brand p{font-size:14px}#cloudSignIn .cloud-form{padding:34px 24px;align-items:flex-start}}
       #cloudSignIn .cloud-brand img{clip-path:circle(50% at 50% 50%)}
       #cloudStatus{position:fixed;right:14px;bottom:14px;z-index:9990;background:#151515;color:#fff;padding:8px 11px;border-radius:999px;font:12px Arial,sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.25);cursor:pointer}
-      #branchControl{position:relative;z-index:2;display:flex;gap:7px;align-items:center;width:fit-content;max-width:calc(100% - 32px);margin:8px 16px 2px auto;background:#fffaf7;border:1px solid #e7cabd;border-radius:10px;padding:8px 10px;box-shadow:0 3px 12px rgba(0,0,0,.14);font:12px Arial,sans-serif;color:#4d291b}#branchControl strong{white-space:nowrap}#branchControl select{max-width:170px;padding:6px;border:1px solid #d8bfb3;border-radius:6px;background:#fff}#branchControl button{padding:6px 8px;border:0;border-radius:6px;background:#ff5a16;color:#fff;font-weight:700;cursor:pointer}#branchControl #logoutButton{background:#4d291b}@media(max-width:680px){#branchControl{width:auto;margin:7px 12px;justify-content:flex-start;flex-wrap:wrap}#branchControl select{flex:1;min-width:145px;max-width:none}}
+      #branchControl{position:absolute;right:22px;top:50%;transform:translateY(-50%);z-index:3;display:flex;gap:9px;align-items:center;font:12px Arial,sans-serif;color:#fff}#branchControl .branch-label{color:#ff8a5b;font-weight:700;text-transform:uppercase;letter-spacing:.08em}#branchControl .branch-name{white-space:nowrap;color:#fff;font-size:13px}#branchControl button{padding:7px 10px;border:1px solid rgba(255,255,255,.35);border-radius:7px;background:#4d291b;color:#fff;font-weight:700;cursor:pointer}#branchControl #logoutButton{background:#4d291b}@media(max-width:680px){#branchControl{position:static;transform:none;margin:8px 14px 0 auto;width:fit-content}}
     `;
     document.head.appendChild(style);
   }
@@ -194,14 +194,27 @@
   function renderBranchControl() {
     if (!branchStore) return;
     let box = document.getElementById('branchControl');
-    if (!box) { box = document.createElement('div'); box.id = 'branchControl'; const tabs = document.querySelector('.tabs'); if (tabs && tabs.parentNode) tabs.parentNode.insertBefore(box, tabs.nextSibling); else document.body.appendChild(box); }
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'branchControl';
+      const header = document.querySelector('header') || document.querySelector('.header');
+      if (header) {
+        header.style.position = 'relative';
+        header.appendChild(box);
+      } else {
+        document.body.appendChild(box);
+      }
+    }
     const selected = branchStore.selectedBranchId || 'sta-rosa';
-    const availableBranches = isOwner() ? branchStore.branches : branchStore.branches.filter(function (branch) { const assignment = assignedBranch(); return assignment && assignment.id === branch.id; });
-    box.innerHTML = '<strong>Branch</strong><select id="branchSelect">' + availableBranches.map(function (branch) { return '<option value="' + branch.id + '"' + (branch.id === selected ? ' selected' : '') + '>' + branch.name + '</option>'; }).join('') + (isOwner() ? '<option value="all"' + (selected === 'all' ? ' selected' : '') + '>All branches (owner)</option>' : '') + '</select>' + (isOwner() ? '<button id="addBranchButton" type="button">+ Branch</button>' : '') + '<button id="logoutButton" type="button">Log out</button>';
-    document.getElementById('branchSelect').onchange = function () { activateBranch(this.value, true); };
-    const addButton = document.getElementById('addBranchButton');
-    if (addButton) addButton.onclick = function () { const name = window.prompt('New branch name (example: 15M Sto. Tomas):'); if (!name || !name.trim()) return; const base = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'branch'; let id = base, n = 2; while (branchStore.branches.some(function (branch) { return branch.id === id; })) id = base + '-' + n++; branchStore.branches.push({ id: id, name: name.trim() }); branchStore.branchData[id] = emptyBranchData(); activateBranch(id, true); };
-    document.getElementById('logoutButton').onclick = async function () { localStorage.removeItem(LOCAL_BRANCH_LOGIN_KEY); await client.auth.signOut(); location.reload(); };
+    const currentBranch = selected === 'all'
+      ? { name: 'All branches (owner)' }
+      : (branchStore.branches || []).find(function (branch) { return branch.id === selected; }) || { name: '15M Sta. Rosa' };
+    box.innerHTML = '<span class="branch-label">Branch</span><strong class="branch-name">' + currentBranch.name + '</strong><button id="logoutButton" type="button">Log out</button>';
+    document.getElementById('logoutButton').onclick = async function () {
+      localStorage.removeItem(LOCAL_BRANCH_LOGIN_KEY);
+      await client.auth.signOut();
+      location.reload();
+    };
   }
   function readDashboard() { try { return branchStore || JSON.parse(localStorage.getItem(BRANCH_STORE_KEY) || '{}'); } catch (_) { return branchStore || {}; } }
   async function upload() { if (!syncReady) return; status('Saving to cloud...'); const result = await client.from(TABLE).upsert({ id: ROW_ID, payload: readDashboard() }, { onConflict: 'id' }); status(result.error ? 'Cloud sync needs attention' : isOwner() ? 'Cloud synced — tap for account approvals' : 'Cloud synced'); if (result.error) console.error('15M cloud sync:', result.error); }
