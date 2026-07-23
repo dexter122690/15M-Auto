@@ -32,13 +32,10 @@
         const bytes = Uint8Array.from(atob(encoded), character => character.charCodeAt(0));
         const html = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
 
-        // Sto. Tomas starts blank. Sta. Rosa keeps its historical records while cloud data loads.
-        const signedInBranch = String(localStorage.getItem('15m-local-branch-login') || '').toLowerCase();
-        const skipImports = signedInBranch === '15msto.tomas@gmail.com'
-          ? '<script>window.__15mSkipStaRosaImports=true;</' + 'script>'
-          : '';
+        // Supabase is the source of truth for the active branch. Do not load old Sta. Rosa imports first.
+        const skipImports = '<script>window.__15mSkipStaRosaImports=true;</' + 'script>';
         const cloudScripts = '<script src="supabase-sync.js?v=branch-data-16"></' + 'script>' +
-          '<script src="expense-actions.js?v=2"></' + 'script>';
+          '<script src="expense-actions.js?v=2"></' + 'script>' + '<script src="export-report.js?v=1"></' + 'script>';
         document.open();
         document.write(html.replace('<body>', '<body>' + skipImports).replace('</body>', cloudScripts + '</body>'));
         document.close();
