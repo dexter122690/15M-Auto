@@ -1,2 +1,163 @@
-(function(){const C=['REPAINT','DETAILING','TINT SMITH','UNDERCOATING','CERAMIC COATING','PPF INSTALLATION','WASHOVER','FULL WASHOVER','PMS','OTHER SALES','PARTS REPLACEMENT'],O=['RENTAL','TRANSPORTATION','COMMUNICATION','UTILITIES','SALARIES & WAGES','CONSTRUCTION','SHIPPING','MISCELLANEOUS','MARKETING','SUPPLIES'],n=x=>Number(x||0),date=(d,s,e,m,y)=>{d=String(d||'').slice(0,10);return(s||e)?(!s||d>=s)&&(!e||d<=e):(!m||d.slice(5,7)===m)&&(!y||d.slice(0,4)===y)},sc=t=>{t=String(t||'').toUpperCase();if(t.includes('FULL WASH'))return'FULL WASHOVER';if(t.includes('WASH'))return'WASHOVER';if(t.includes('PPF'))return'PPF INSTALLATION';if(t.includes('CERAMIC')||t.includes('GRAPHENE'))return'CERAMIC COATING';if(t.includes('UNDERCOAT'))return'UNDERCOATING';if(t.includes('TINT'))return'TINT SMITH';if(t.includes('DETAIL'))return'DETAILING';if(t.includes('PAINT'))return'REPAINT';if(t.includes('PMS'))return'PMS';return'OTHER SALES'},oc=t=>O.find(x=>String(t||'').toUpperCase().includes(x))||'MISCELLANEOUS';function lib(){return new Promise((ok,no)=>{if(window.ExcelJS)return ok();let q=document.createElement('script');q.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';q.onload=ok;q.onerror=no;document.head.append(q)})}function chart(kind,labels,a,b){let c=document.createElement('canvas'),x=c.getContext('2d');c.width=900;c.height=330;x.fillStyle='#fffaf7';x.fillRect(0,0,900,330);if(kind==='pie'){let sum=a.reduce((p,v)=>p+v,0)||1,st=-Math.PI/2,colors=['#ff5a16','#251d1a','#ffb28f','#8b4b33','#d98a5d','#6a4b3b'];a.forEach((v,i)=>{let en=st+v/sum*Math.PI*2;x.beginPath();x.moveTo(230,165);x.arc(230,165,125,st,en);x.fillStyle=colors[i%6];x.fill();st=en});labels.slice(0,6).forEach((l,i)=>{x.fillStyle=colors[i%6];x.fillRect(460,35+i*42,18,18);x.fillStyle='#251d1a';x.font='20px Arial';x.fillText(l+'  ₱'+a[i].toLocaleString('en-PH'),490,51+i*42)})}else{let max=Math.max(...a,...b,1),w=760/(labels.length||1);x.strokeStyle='#ddd';for(let i=0;i<4;i++){let yy=40+i*65;x.beginPath();x.moveTo(70,yy);x.lineTo(850,yy);x.stroke()}[['#ff5a16',a],['#251d1a',b]].forEach(([col,v],z)=>{x.strokeStyle=col;x.lineWidth=5;x.beginPath();v.forEach((q,i)=>{let xx=80+i*w,yy=300-q/max*240;i?x.lineTo(xx,yy):x.moveTo(xx,yy)});x.stroke()});labels.forEach((l,i)=>{x.fillStyle='#555';x.font='14px Arial';x.fillText(l,75+i*w,320)})}return c.toDataURL('image/png')}async function go(){let b=document.getElementById('exportExcelReport'),s=exportStart.value,e=exportEnd.value,m=dashboardMonth.value,y=dashboardYear.value;if(s&&e&&s>e)return alert('End date must be after Start date.');b.disabled=true;b.textContent='Preparing executive report…';try{await lib();let inv=(data.invoices||[]).filter(i=>date(i.date,s,e,m,y)),ex=(data.expenses||[]).filter(i=>date(i.date,s,e,m,y)),sales=Object.fromEntries(C.map(x=>[x,0])),op=Object.fromEntries(O.map(x=>[x,0])),cost=0;inv.forEach(i=>{(i.lines?.length?i.lines:[{service:i.service||i.description,amount:i.amount}]).forEach(l=>sales[sc(l.service)]+=n(l.amount||i.amount));(i.partsItems||[]).forEach(p=>sales['PARTS REPLACEMENT']+=n(p.total||n(p.qty)*n(p.unitPrice)))});ex.forEach(i=>{let v=n(i.amount)*n(i.qty||1);if(/COST OF SALES/i.test(i.type||i.category))cost+=v;else op[oc(i.type||i.category)]+=v});let ts=Object.values(sales).reduce((a,v)=>a+v,0),to=Object.values(op).reduce((a,v)=>a+v,0),gross=ts-cost,net=gross-to,wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Executive P&L');ws.mergeCells('A1:H1');ws.getCell('A1').value='15M AUTOCARE SERVICES';ws.getCell('A1').font={bold:true,size:22,color:{argb:'FFFFFFFF'}};ws.getCell('A1').fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF111111'}};ws.getCell('A1').alignment={horizontal:'center'};ws.mergeCells('A2:H2');ws.getCell('A2').value='EXECUTIVE PROFIT & LOSS REPORT • '+(s||'All dates')+' to '+(e||'Selected period');ws.getCell('A2').font={bold:true,color:{argb:'FFFF5A16'}};ws.getCell('A2').alignment={horizontal:'center'};let r=4;function row(label,val,style){let q=ws.getRow(r++);q.getCell(1).value=label;q.getCell(2).value=val;if(style){q.eachCell(c=>{c.fill={type:'pattern',pattern:'solid',fgColor:{argb:style}};c.font={bold:true,color:{argb:'FFFFFFFF'}})}q.height=22}q.getCell(2).numFmt='₱#,##0.00';}row('SALES','', 'FFFF5A16');C.forEach(x=>row(x,sales[x]));row('TOTAL SALES',ts,'FF251D1A');row('COST OF SALES',cost,'FF6A4B3B');row('GROSS PROFIT',gross,'FF1B7F3B');row('OPERATING EXPENSES','', 'FFFF5A16');O.forEach(x=>row(x,op[x]));row('TOTAL OPEX',to,'FF251D1A');row('NET INCOME',net,net>=0?'FF1B7F3B':'FFB42318');ws.getColumn(1).width=30;ws.getColumn(2).width=18;let pie=wb.addImage({base64:chart('pie',C,sales?C.map(x=>sales[x]):[],[]),extension:'png'}),line=wb.addImage({base64:chart('line',['Sales','Cost','OPEX','Net'],[ts,cost,to,net],[0,0,0,0]),extension:'png'});ws.addImage(pie,'D4:H17');ws.addImage(line,'D19:H32');let ds=wb.addWorksheet('Sales Details');ds.addRow(['DATE','CLIENT','SERVICE','AMOUNT']);inv.forEach(i=>ds.addRow([i.date,i.client||i.name||'',i.service||i.description||'',n(i.amount)]));let de=wb.addWorksheet('Expense Details');de.addRow(['DATE','ITEM','TYPE','QTY','AMOUNT','TOTAL']);ex.forEach(i=>de.addRow([i.date,i.description||i.item||'',i.type||i.category||'',n(i.qty||1),n(i.amount),n(i.amount)*n(i.qty||1)]));[ds,de].forEach(sh=>{sh.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};sh.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF251D1A'}};sh.columns.forEach(c=>c.width=20)});let out=await wb.xlsx.writeBuffer(),u=URL.createObjectURL(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),a=document.createElement('a');a.href=u;a.download='15M-Executive-P&L-'+(s||y||'Report')+'.xlsx';a.click();URL.revokeObjectURL(u)}catch(x){alert('Unable to create report.')}finally{b.disabled=false;b.textContent='Export Executive Excel'}}function add(tries){if(document.getElementById('exportExcelReport'))return;let root=document.querySelector('#dashboard');if(!root){if((tries||0)<20)setTimeout(()=>add((tries||0)+1),300);return}let w=document.createElement('section');w.id='executiveExportPanel';w.style.cssText='display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:0 0 18px;padding:14px 16px;border:1px solid #f0c6b3;border-radius:12px;background:#fff7f2';w.innerHTML='<strong style="width:100%;color:#251d1a">Executive report</strong><label>Start date<input id="exportStart" type="date"></label><label>End date<input id="exportEnd" type="date"></label><button id="exportExcelReport" type="button" style="background:#ff5a16;color:#fff;border:0;border-radius:8px;padding:12px 16px;font-weight:bold">Export Executive Excel</button>';root.prepend(w);exportExcelReport.onclick=go}setTimeout(()=>add(0),900)})();
+(function () {
+  'use strict';
 
+  const SALES_ORDER = ['REPAINT', 'DETAILING', 'TINT SMITH', 'UNDERCOATING', 'CERAMIC COATING', 'PPF INSTALLATION', 'WASHOVER', 'FULL WASHOVER', 'PMS', 'OTHER SALES', 'PARTS REPLACEMENT'];
+  const EXPENSE_ORDER = ['RENTAL', 'TRANSPORTATION', 'COMMUNICATION', 'UTILITIES', 'SALARIES & WAGES', 'CONSTRUCTION', 'SHIPPING', 'MISCELLANEOUS', 'MARKETING', 'SUPPLIES'];
+  const peso = '₱#,##0.00';
+  const value = input => Number(input || 0);
+
+  function salesCategory(service) {
+    const text = String(service || '').toUpperCase();
+    if (text.includes('FULL WASH')) return 'FULL WASHOVER';
+    if (text.includes('WASH')) return 'WASHOVER';
+    if (text.includes('PPF')) return 'PPF INSTALLATION';
+    if (text.includes('CERAMIC') || text.includes('GRAPHENE')) return 'CERAMIC COATING';
+    if (text.includes('UNDERCOAT')) return 'UNDERCOATING';
+    if (text.includes('TINT')) return 'TINT SMITH';
+    if (text.includes('DETAIL')) return 'DETAILING';
+    if (text.includes('PAINT')) return 'REPAINT';
+    if (text.includes('PMS')) return 'PMS';
+    return 'OTHER SALES';
+  }
+
+  function expenseCategory(type) {
+    const text = String(type || '').toUpperCase();
+    return EXPENSE_ORDER.find(item => text.includes(item)) || 'MISCELLANEOUS';
+  }
+
+  function recordIsSelected(record, start, end) {
+    const date = String(record.date || '').slice(0, 10);
+    return (!start || date >= start) && (!end || date <= end);
+  }
+
+  function loadExcel() {
+    if (window.ExcelJS) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  async function exportReport() {
+    const button = document.getElementById('exportExcelReport');
+    const start = document.getElementById('exportStart').value;
+    const end = document.getElementById('exportEnd').value;
+    if (start && end && start > end) {
+      alert('End date must be after Start date.');
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Preparing executive report…';
+    try {
+      await loadExcel();
+      const report = typeof data === 'undefined' ? {} : data;
+      const invoices = (report.invoices || []).filter(item => recordIsSelected(item, start, end));
+      const expenses = (report.expenses || []).filter(item => recordIsSelected(item, start, end));
+      const sales = Object.fromEntries(SALES_ORDER.map(item => [item, 0]));
+      const opex = Object.fromEntries(EXPENSE_ORDER.map(item => [item, 0]));
+      let costOfSales = 0;
+
+      invoices.forEach(invoice => {
+        const lines = invoice.lines && invoice.lines.length ? invoice.lines : [{ service: invoice.service || invoice.description, amount: invoice.amount }];
+        lines.forEach(line => { sales[salesCategory(line.service)] += value(line.amount || invoice.amount); });
+        (invoice.partsItems || []).forEach(part => { sales['PARTS REPLACEMENT'] += value(part.total || value(part.qty) * value(part.unitPrice)); });
+      });
+      expenses.forEach(expense => {
+        const total = value(expense.amount) * value(expense.qty || 1);
+        if (/COST OF SALES/i.test(expense.type || expense.category || '')) costOfSales += total;
+        else opex[expenseCategory(expense.type || expense.category)] += total;
+      });
+
+      const totalSales = Object.values(sales).reduce((sum, amount) => sum + amount, 0);
+      const totalOpex = Object.values(opex).reduce((sum, amount) => sum + amount, 0);
+      const grossProfit = totalSales - costOfSales;
+      const netIncome = grossProfit - totalOpex;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Executive P&L');
+      sheet.mergeCells('A1:F1');
+      sheet.getCell('A1').value = '15M AUTOCARE SERVICES';
+      sheet.getCell('A1').font = { bold: true, size: 22, color: { argb: 'FFFFFFFF' } };
+      sheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF111111' } };
+      sheet.getCell('A1').alignment = { horizontal: 'center' };
+      sheet.mergeCells('A2:F2');
+      sheet.getCell('A2').value = 'EXECUTIVE PROFIT & LOSS REPORT — ' + (start || 'All dates') + ' to ' + (end || 'Selected period');
+      sheet.getCell('A2').font = { bold: true, color: { argb: 'FFFF5A16' } };
+      sheet.getCell('A2').alignment = { horizontal: 'center' };
+      sheet.getColumn(1).width = 32;
+      sheet.getColumn(2).width = 18;
+
+      let rowNumber = 4;
+      const row = (label, amount, color) => {
+        const current = sheet.getRow(rowNumber++);
+        current.getCell(1).value = label;
+        if (amount !== null) current.getCell(2).value = amount;
+        current.getCell(2).numFmt = peso;
+        if (color) {
+          current.eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+          });
+        }
+      };
+
+      row('SALES', null, 'FFFF5A16');
+      SALES_ORDER.forEach(item => row(item, sales[item]));
+      row('TOTAL SALES', totalSales, 'FF251D1A');
+      row('COST OF SALES', costOfSales, 'FF6A4B3B');
+      row('GROSS PROFIT', grossProfit, 'FF1B7F3B');
+      row('OPERATING EXPENSES', null, 'FFFF5A16');
+      EXPENSE_ORDER.forEach(item => row(item, opex[item]));
+      row('TOTAL OPEX', totalOpex, 'FF251D1A');
+      row('NET INCOME', netIncome, netIncome >= 0 ? 'FF1B7F3B' : 'FFB42318');
+
+      const salesSheet = workbook.addWorksheet('Sales Details');
+      salesSheet.addRow(['DATE', 'CLIENT', 'SERVICE', 'AMOUNT']);
+      invoices.forEach(invoice => salesSheet.addRow([invoice.date, invoice.client || invoice.name || '', invoice.service || invoice.description || '', value(invoice.amount)]));
+      const expenseSheet = workbook.addWorksheet('Expense Details');
+      expenseSheet.addRow(['DATE', 'ITEM', 'TYPE', 'QTY', 'AMOUNT', 'TOTAL']);
+      expenses.forEach(expense => expenseSheet.addRow([expense.date, expense.description || expense.item || '', expense.type || expense.category || '', value(expense.qty || 1), value(expense.amount), value(expense.amount) * value(expense.qty || 1)]));
+      [salesSheet, expenseSheet].forEach(detailSheet => {
+        detailSheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        detailSheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF251D1A' } };
+        detailSheet.columns.forEach(column => { column.width = 20; });
+      });
+
+      const output = await workbook.xlsx.writeBuffer();
+      const url = URL.createObjectURL(new Blob([output], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = '15M-Executive-P-and-L-' + (start || 'Report') + '.xlsx';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert('The report could not be created. Please try again.');
+      console.error(error);
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Export Executive Excel';
+    }
+  }
+
+  function addPanel() {
+    if (document.getElementById('exportExcelReport')) return true;
+    const dashboard = document.getElementById('dashboard');
+    if (!dashboard) return false;
+    const panel = document.createElement('section');
+    panel.id = 'executiveExportPanel';
+    panel.style.cssText = 'display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:0 0 18px;padding:14px 16px;border:1px solid #f0c6b3;border-radius:12px;background:#fff7f2';
+    panel.innerHTML = '<strong style="width:100%;color:#251d1a">Executive report</strong><label>Start date<input id="exportStart" type="date"></label><label>End date<input id="exportEnd" type="date"></label><button id="exportExcelReport" type="button" style="background:#ff5a16;color:#fff;border:0;border-radius:8px;padding:12px 16px;font-weight:bold">Export Executive Excel</button>';
+    dashboard.prepend(panel);
+    document.getElementById('exportExcelReport').addEventListener('click', exportReport);
+    return true;
+  }
+
+  function install(attempt) {
+    if (!addPanel() && attempt < 30) setTimeout(() => install(attempt + 1), 300);
+  }
+
+  setTimeout(() => install(0), 800);
+}());
