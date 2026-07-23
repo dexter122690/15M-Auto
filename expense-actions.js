@@ -56,6 +56,8 @@
       document.getElementById("expenseEditId").value=""; var button=form.querySelector("button[type=submit]")||form.querySelector("button"); if(button) button.textContent="Add expense"; if(typeof save==="function") save(); if(typeof render==="function") render();
     },true);
     var original=window.render; if(typeof original==="function"){ window.render=function(){ var result=original.apply(this,arguments); setTimeout(addActions,0); return result; }; }
-    new MutationObserver(addActions).observe(document.body,{childList:true,subtree:true}); setTimeout(addActions,300);
+    // The main render function already refreshes this table. Observing every DOM change here
+    // would re-write the buttons repeatedly and can make the browser unresponsive.
+    setTimeout(addActions,300);
   } bind();
 }());

@@ -35,7 +35,7 @@
         // Supabase is the source of truth for the active branch. Do not load old Sta. Rosa imports first.
         const skipImports = '<script>window.__15mSkipStaRosaImports=true;</' + 'script>';
         const cloudScripts = '<script src="supabase-sync.js?v=branch-data-16"></' + 'script>' +
-          '<script src="expense-actions.js?v=1"></' + 'script>';
+          '<script src="expense-actions.js?v=2"></' + 'script>';
         document.open();
         document.write(html.replace('<body>', '<body>' + skipImports).replace('</body>', cloudScripts + '</body>'));
         document.close();
