@@ -161,3 +161,52 @@
 
   setTimeout(() => install(0), 800);
 }());
+
+(function () {
+  'use strict';
+
+  const replacements = [
+    ['â‚±', '₱'],
+    ['â€¢', '•'],
+    ['â€“', '–'],
+    ['â€”', '—'],
+    ['â€œ', '“'],
+    ['â€', '”'],
+    ['â€™', '’'],
+    ['Ã±', 'ñ'],
+    ['Ã‘', 'Ñ'],
+    ['Ã©', 'é'],
+    ['Â', '']
+  ];
+
+  function cleanText(text) {
+    return replacements.reduce((result, pair) => result.split(pair[0]).join(pair[1]), text);
+  }
+
+  function cleanPage(root) {
+    const walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => {
+      const fixed = cleanText(node.nodeValue);
+      if (fixed !== node.nodeValue) node.nodeValue = fixed;
+    });
+  }
+
+  function startCleaning() {
+    cleanPage(document.body);
+    new MutationObserver(records => {
+      records.forEach(record => record.addedNodes.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const fixed = cleanText(node.nodeValue);
+          if (fixed !== node.nodeValue) node.nodeValue = fixed;
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          cleanPage(node);
+        }
+      }));
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startCleaning);
+  else startCleaning();
+}());
