@@ -245,3 +245,62 @@
   begin();
   if (repairedLocalBranchStorage) setTimeout(function () { location.reload(); }, 50);
 }());
+
+/* Quick client lookup for Invoice Making and Sales Report. */
+(function () {
+  function openForEdit(id) {
+    const invoiceTab = Array.from(document.querySelectorAll('.tabs button')).find(function (button) { return button.textContent.trim() === 'Invoice Making'; });
+    if (invoiceTab) invoiceTab.click();
+    setTimeout(function () { if (typeof edit === 'function') edit(id); }, 50);
+  }
+  function addSalesActions(rows) {
+    const table = rows.closest('table');
+    if (!table) return;
+    const heading = table.querySelector('thead tr');
+    if (heading && !heading.querySelector('.sales-actions-heading')) {
+      const th = document.createElement('th'); th.className = 'sales-actions-heading'; th.textContent = 'Actions'; heading.appendChild(th);
+    }
+    Array.from(rows.querySelectorAll('tr')).forEach(function (row) {
+      if (row.children.length <= 1 || row.querySelector('.sales-quick-actions')) return;
+      const invoiceId = row.querySelector('b') && row.querySelector('b').textContent.trim();
+      if (!invoiceId) return;
+      const cell = document.createElement('td');
+      cell.className = 'sales-quick-actions';
+      cell.innerHTML = '<button type="button" class="dark">Edit</button> <button type="button" class="dark">Print</button>';
+      const buttons = cell.querySelectorAll('button');
+      buttons[0].onclick = function () { openForEdit(invoiceId); };
+      buttons[1].onclick = function () { if (typeof printOne === 'function') printOne(invoiceId); };
+      row.appendChild(cell);
+    });
+  }
+  function addLookup(sectionId, rowsId, addActions) {
+    const section = document.getElementById(sectionId), rows = document.getElementById(rowsId);
+    if (!section || !rows || document.getElementById(sectionId + 'Lookup')) return false;
+    const lookup = document.createElement('div');
+    lookup.id = sectionId + 'Lookup'; lookup.className = 'quick-lookup';
+    lookup.innerHTML = '<label>Search client, contact, vehicle, or address<input type="search" placeholder="Type to search" autocomplete="off"></label><small>Search results update as you type.</small>';
+    const table = rows.closest('.table');
+    if (table && table.parentNode) table.parentNode.insertBefore(lookup, table);
+    const field = lookup.querySelector('input');
+    const matchRows = function () {
+      const term = field.value.trim().toLowerCase();
+      Array.from(rows.querySelectorAll('tr')).forEach(function (row) {
+        const visible = !term || row.textContent.toLowerCase().includes(term);
+        row.style.display = visible ? '' : 'none';
+      });
+    };
+    field.addEventListener('input', matchRows);
+    new MutationObserver(function () { if (addActions) addSalesActions(rows); matchRows(); }).observe(rows, { childList: true });
+    if (addActions) addSalesActions(rows);
+    return true;
+  }
+  function setupLookup() {
+    if (!document.getElementById('quickLookupStyle')) {
+      const style = document.createElement('style'); style.id = 'quickLookupStyle';
+      style.textContent = '.quick-lookup{margin:18px 0 14px;max-width:360px}.quick-lookup label{display:block;font-size:13px;font-weight:700;color:#4d382d}.quick-lookup input{box-sizing:border-box;width:100%;margin-top:7px;padding:12px 14px;border:1px solid #d9c9bf;border-radius:9px;background:#fff;color:#24130c;font-size:15px}.quick-lookup small{display:block;margin-top:6px;color:#80695b;font-weight:400}.sales-quick-actions{white-space:nowrap}.sales-quick-actions button{margin:2px 0}@media(max-width:700px){.quick-lookup{max-width:none}.sales-quick-actions button{display:block;width:100%;margin:3px 0}}';
+      document.head.appendChild(style);
+    }
+    return addLookup('invoices', 'invoiceRows', false) && addLookup('sales', 'salesRows', true);
+  }
+  const lookupTimer = setInterval(function () { if (setupLookup()) clearInterval(lookupTimer); }, 200);
+}());
