@@ -55,9 +55,62 @@
       var mode=document.getElementById("eMode"); if(mode){old.mode=mode.value;old.paymentMode=mode.value;} var ref=document.getElementById("eReference"); if(ref){old.reference=ref.value;old.ref=ref.value;} var remarks=document.getElementById("eRemarks"); if(remarks){old.remarks=remarks.value;old.notes=remarks.value;}
       document.getElementById("expenseEditId").value=""; var button=form.querySelector("button[type=submit]")||form.querySelector("button"); if(button) button.textContent="Add expense"; if(typeof save==="function") save(); if(typeof render==="function") render();
     },true);
-    var original=window.render; if(typeof original==="function"){ window.render=function(){ var result=original.apply(this,arguments); setTimeout(addActions,0); return result; }; }
+    function numberOf(entry){
+      var quantity=Number(entry.qty||entry.quantity||1), unit=Number(entry.amount||0), total=entry.total;
+      total=total===undefined||total===null||total===""?unit*quantity:Number(total);
+      return Number.isFinite(total)?total:0;
+    }
+    function selectedPeriod(){
+      var month="", year="", labels=document.querySelectorAll("#expenses label");
+      Array.from(labels).forEach(function(label){
+        var select=label.querySelector("select"), title=String(label.textContent||"").trim().toLowerCase();
+        if(!select) return;
+        if(title.indexOf("month")===0) month=select.value||"";
+        if(title.indexOf("year")===0) year=select.value||"";
+      });
+      return {month:month,year:year};
+    }
+    function monthNumber(value){
+      var text=String(value||"").trim().toLowerCase();
+      if(!text||text.indexOf("all")===0) return "";
+      if(/^\d{1,2}$/.test(text)) return String(Number(text)).padStart(2,"0");
+      var months=["january","february","march","april","may","june","july","august","september","october","november","december"];
+      var found=months.indexOf(text); return found<0?"":String(found+1).padStart(2,"0");
+    }
+    function standardDate(value){
+      var text=String(value||"").trim();
+      var iso=text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if(iso) return iso[1]+"-"+String(iso[2]).padStart(2,"0")+"-"+String(iso[3]).padStart(2,"0");
+      var local=text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+      return local?local[3]+"-"+String(local[2]).padStart(2,"0")+"-"+String(local[1]).padStart(2,"0"):"";
+    }
+    function updateSummary(){
+      if(typeof data==="undefined"||!Array.isArray(data.expenses)) return;
+      var period=selectedPeriod(), month=monthNumber(period.month), year=String(period.year||"").replace(/\D/g,"");
+      if(year.length!==4) year="";
+      var rows=data.expenses.filter(function(entry){
+        var date=standardDate(textOf(entry,["date","invoiceDate"]));
+        return (!year||date.slice(0,4)===year)&&(!month||date.slice(5,7)===month);
+      });
+      var total=rows.reduce(function(sum,entry){return sum+numberOf(entry);},0);
+      var cost=rows.filter(function(entry){return clean(textOf(entry,["type","category","kind"]))===clean("Cost of Sales");}).reduce(function(sum,entry){return sum+numberOf(entry);},0);
+      var petty=rows.filter(function(entry){return clean(textOf(entry,["mode","paymentMode"])).indexOf("petty")>=0;}).reduce(function(sum,entry){return sum+numberOf(entry);},0);
+      var cib=rows.filter(function(entry){return clean(textOf(entry,["mode","paymentMode"])).indexOf("cib")>=0;}).reduce(function(sum,entry){return sum+numberOf(entry);},0);
+      Array.from(document.querySelectorAll("#expenses .card")).forEach(function(card){
+        var label=String(card.querySelector("span")?.textContent||"").trim().toLowerCase(), value;
+        if(label==="expenses in selected period") value=total;
+        else if(label==="cost of sales") value=cost;
+        else if(label==="paid from petty cash") value=petty;
+        else if(label==="paid from cib") value=cib;
+        else return;
+        var strong=card.querySelector("strong"); if(strong) strong.textContent=new Intl.NumberFormat("en-PH",{style:"currency",currency:"PHP",maximumFractionDigits:2}).format(value);
+        var detail=card.querySelectorAll("span")[1]; if(detail&&label==="expenses in selected period") detail.textContent=rows.length+" expense entr"+(rows.length===1?"y":"ies");
+      });
+    }
+    var original=window.render; if(typeof original==="function"){ window.render=function(){ var result=original.apply(this,arguments); setTimeout(function(){addActions();updateSummary();},0); return result; }; }
     // The main render function already refreshes this table. Observing every DOM change here
     // would re-write the buttons repeatedly and can make the browser unresponsive.
-    setTimeout(addActions,300);
+    document.querySelectorAll("#expenses select").forEach(function(select){select.addEventListener("change",updateSummary);});
+    setTimeout(function(){addActions();updateSummary();},300);
   } bind();
 }());
