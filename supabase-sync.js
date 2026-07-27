@@ -233,6 +233,15 @@
       clearInterval(cloudReadyWatch);
     }
   }, 200);
+  const stoTomasImportWatch = setInterval(function () {
+    const branchName = document.querySelector('#branchControl .branch-name');
+    if (!window.__15mCloudReady || !branchName || branchName.textContent.trim() !== '15M Sto. Tomas' || window.__15mStoTomasImportRequested) return;
+    window.__15mStoTomasImportRequested = true;
+    const importer = document.createElement('script');
+    importer.src = 'stotomas-import.js?v=2';
+    document.head.appendChild(importer);
+    clearInterval(stoTomasImportWatch);
+  }, 250);
   begin();
   if (repairedLocalBranchStorage) setTimeout(function () { location.reload(); }, 50);
 }());
