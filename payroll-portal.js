@@ -5,6 +5,17 @@
     "https://autocare-15m-payroll.dexterbsanagustin.chatgpt.site/";
 
   function activatePayrollTab(payroll, tabButton) {
+    activateWebsiteTab("payroll", tabButton);
+  }
+
+  function activateWebsiteTab(sectionId, tabButton) {
+    var section = document.getElementById(sectionId);
+    if (!section) return;
+
+    if (location.hash === "#payroll" && sectionId !== "payroll") {
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+
     Array.prototype.forEach.call(
       document.querySelectorAll(".tabs button"),
       function (button) {
@@ -17,30 +28,57 @@
         section.classList.remove("active");
       }
     );
-    tabButton.classList.add("active");
-    payroll.classList.add("active");
+
+    if (tabButton) tabButton.classList.add("active");
+    section.classList.add("active");
   }
 
-  if (!window.__payrollPortalTabHandler) {
-    document.addEventListener(
-      "click",
-      function (event) {
-        var tabButton =
-          event.target.closest &&
-          event.target.closest("#payrollTabButton");
-        if (!tabButton) return;
+  function getSectionIdFromButton(tabButton) {
+    var inlineHandler = tabButton.getAttribute("onclick") || "";
+    var match = inlineHandler.match(/tab\(['"]([^'"]+)['"]/);
+    return match ? match[1] : null;
+  }
 
-        var payroll = document.getElementById("payroll");
-        if (!payroll) return;
+  function installTabFallback() {
+    window.tab = function (sectionId, tabButton) {
+      activateWebsiteTab(sectionId, tabButton);
+    };
 
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        activatePayrollTab(payroll, tabButton);
-      },
-      true
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".tabs button"),
+      function (tabButton) {
+        var sectionId = getSectionIdFromButton(tabButton);
+        if (!sectionId || tabButton.dataset.tabFallbackBound === "true") return;
+
+        tabButton.dataset.tabFallbackBound = "true";
+        tabButton.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          activateWebsiteTab(sectionId, tabButton);
+        });
+      }
     );
-    window.__payrollPortalTabHandler = true;
+
+    if (window.__15mTabFallbackInstalled) return;
+    window.__15mTabFallbackInstalled = true;
+
+    document.addEventListener("click", function (event) {
+      var tabButton =
+        event.target.closest && event.target.closest(".tabs button");
+      if (!tabButton) return;
+
+      var sectionId = getSectionIdFromButton(tabButton);
+      if (!sectionId) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      activateWebsiteTab(sectionId, tabButton);
+    }, true);
   }
+
+  installTabFallback();
+  setTimeout(installTabFallback, 0);
+  setTimeout(installTabFallback, 500);
 
   function addStyles() {
     if (document.getElementById("payrollPortalStyles")) return;
@@ -48,10 +86,8 @@
     var style = document.createElement("style");
     style.id = "payrollPortalStyles";
     style.textContent =
-      "body:has(#payroll:target) main>section.tab{display:none!important}" +
-      "body:has(#payroll:target) main>#payroll.tab{display:block!important}" +
-      ".tabs iframe#payrollTabButtonFrame{display:inline-block;width:96px;height:42px;border:0;border-radius:8px;background:transparent;vertical-align:middle}" +
-      "body:has(#payroll:target) #payrollTabButtonFrame{background:#ff4b00!important}" +
+      "header,.tabs{position:relative;z-index:20}" +
+      "main{position:relative;z-index:1}" +
       "#payroll.payroll-portal-tab{padding:0!important;max-width:none!important;background:#0a0a0a}" +
       "#payroll .payroll-portal-shell{min-height:calc(100vh - 150px);background:#0a0a0a;border-top:3px solid #ff4b00}" +
       "#payroll .payroll-portal-bar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px max(18px,3vw);background:#0a0a0a;color:#fff;border-bottom:1px solid #292929}" +
@@ -100,15 +136,11 @@
     payroll.appendChild(shell);
     payroll.classList.add("payroll-portal-tab");
     payroll.dataset.portalInstalled = "true";
+    payroll.dataset.portalVersion = "tab-fallback-v1";
 
     var tabButton = document.getElementById("payrollTabButton");
-    if (tabButton) {
-      var tabFrame = document.createElement("iframe");
-      tabFrame.id = "payrollTabButtonFrame";
-      tabFrame.src = "payroll-tab.html";
-      tabFrame.title = "Payroll";
-      tabFrame.setAttribute("aria-label", "Open 15M Autocare Payroll System");
-      tabButton.parentNode.replaceChild(tabFrame, tabButton);
+    if (location.hash === "#payroll" && tabButton) {
+      activatePayrollTab(payroll, tabButton);
     }
 
     return true;
