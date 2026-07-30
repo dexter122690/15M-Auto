@@ -50,8 +50,8 @@
     style.textContent =
       "body:has(#payroll:target) main>section.tab{display:none!important}" +
       "body:has(#payroll:target) main>#payroll.tab{display:block!important}" +
-      ".tabs a#payrollTabButton{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:0;border-radius:8px;color:inherit;text-decoration:none;font:inherit;font-weight:700;cursor:pointer}" +
-      "body:has(#payroll:target) #payrollTabButton{background:#ff4b00!important;color:#fff!important}" +
+      ".tabs iframe#payrollTabButtonFrame{display:inline-block;width:96px;height:42px;border:0;border-radius:8px;background:transparent;vertical-align:middle}" +
+      "body:has(#payroll:target) #payrollTabButtonFrame{background:#ff4b00!important}" +
       "#payroll.payroll-portal-tab{padding:0!important;max-width:none!important;background:#0a0a0a}" +
       "#payroll .payroll-portal-shell{min-height:calc(100vh - 150px);background:#0a0a0a;border-top:3px solid #ff4b00}" +
       "#payroll .payroll-portal-bar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px max(18px,3vw);background:#0a0a0a;color:#fff;border-bottom:1px solid #292929}" +
@@ -102,14 +102,13 @@
     payroll.dataset.portalInstalled = "true";
 
     var tabButton = document.getElementById("payrollTabButton");
-    if (tabButton && tabButton.tagName !== "A") {
-      var tabLink = document.createElement("a");
-      tabLink.id = "payrollTabButton";
-      tabLink.className = tabButton.className;
-      tabLink.href = "#payroll";
-      tabLink.textContent = "Payroll";
-      tabLink.setAttribute("aria-label", "Open 15M Autocare Payroll System");
-      tabButton.parentNode.replaceChild(tabLink, tabButton);
+    if (tabButton) {
+      var tabFrame = document.createElement("iframe");
+      tabFrame.id = "payrollTabButtonFrame";
+      tabFrame.src = "payroll-tab.html";
+      tabFrame.title = "Payroll";
+      tabFrame.setAttribute("aria-label", "Open 15M Autocare Payroll System");
+      tabButton.parentNode.replaceChild(tabFrame, tabButton);
     }
 
     return true;
