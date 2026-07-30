@@ -3,24 +3,34 @@
 
   var PAYROLL_URL = "https://15-m-autocare-payroll.vercel.app/";
 
-  function redirectToPayroll(event) {
-    var button = event.target.closest && event.target.closest("#payrollTabButton");
-    if (!button) return;
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    window.location.assign(PAYROLL_URL);
-  }
-
   function removeEmbeddedPayroll() {
     var payrollPanel = document.getElementById("payroll");
     if (payrollPanel) payrollPanel.remove();
   }
 
-  document.addEventListener("click", redirectToPayroll, true);
-  removeEmbeddedPayroll();
+  function makePayrollTabDirect() {
+    var oldButton = document.getElementById("payrollTabButton");
+    if (!oldButton || oldButton.dataset.directPayroll === "true") return;
 
-  new MutationObserver(removeEmbeddedPayroll).observe(document.documentElement, {
+    var directButton = oldButton.cloneNode(true);
+    directButton.removeAttribute("onclick");
+    directButton.dataset.directPayroll = "true";
+    directButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      window.location.href = PAYROLL_URL;
+    });
+
+    oldButton.replaceWith(directButton);
+  }
+
+  function applyPayrollRedirect() {
+    removeEmbeddedPayroll();
+    makePayrollTabDirect();
+  }
+
+  applyPayrollRedirect();
+  new MutationObserver(applyPayrollRedirect).observe(document.documentElement, {
     childList: true,
     subtree: true
   });
