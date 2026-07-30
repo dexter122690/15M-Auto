@@ -12,6 +12,8 @@
   }
 
   removePayrollTab();
-  setTimeout(removePayrollTab, 0);
-  setTimeout(removePayrollTab, 500);
+  new MutationObserver(removePayrollTab).observe(document.documentElement, {
+    childList: true,
+    subtree: true
+  });
 })();
