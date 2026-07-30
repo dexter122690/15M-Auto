@@ -2,7 +2,7 @@
   "use strict";
 
   var PAYROLL_URL =
-    "https://autocare-15m-payroll.dexterbsanagustin.chatgpt.site/";
+    "https://15-m-autocare-payroll.vercel.app/";
 
   function activatePayrollTab(payroll, tabButton) {
     activateWebsiteTab("payroll", tabButton);
@@ -153,18 +153,3 @@
     observer.observe(document.documentElement, { childList: true, subtree: true });
   }
 })();
-
-function removePayrollNavigation() {
-  var button = document.getElementById("payrollTabButton");
-  var panel = document.getElementById("payroll");
-  if (button) button.remove();
-  if (panel) panel.remove();
-  if (location.hash === "#payroll") {
-    history.replaceState(null, "", location.pathname + location.search);
-  }
-}
-removePayrollNavigation();
-new MutationObserver(removePayrollNavigation).observe(document.documentElement, {
-  childList: true,
-  subtree: true
-});
