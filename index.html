@@ -34,8 +34,7 @@
           '<script src="expense-actions.js?v=2"><\/script>' +
           '<script src="export-report.js?v=3"><\/script>' +
           '<script src="payroll-portal.js?v=14"><\/script>' +
-          '<script src="quotation-tab.js?v=1"><\/script>' +
-          '<script src="remove-payroll-tab.js?v=2"><\/script>';
+          '<script src="quotation-tab.js?v=1"><\/script>';
         document.open();
         document.write(html.replace("<body>", "<body>" + skipStaRosaImports).replace("</body>", scripts + "</body>"));
         document.close();
