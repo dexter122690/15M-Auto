@@ -62,6 +62,23 @@
     if (tabButton) {
       tabButton.textContent = "Payroll";
       tabButton.setAttribute("aria-label", "Open 15M Autocare Payroll System");
+      tabButton.removeAttribute("onclick");
+      tabButton.addEventListener("click", function () {
+        Array.prototype.forEach.call(
+          document.querySelectorAll(".tabs button"),
+          function (button) {
+            button.classList.remove("active");
+          }
+        );
+        Array.prototype.forEach.call(
+          document.querySelectorAll("main > section.tab"),
+          function (section) {
+            section.classList.remove("active");
+          }
+        );
+        tabButton.classList.add("active");
+        payroll.classList.add("active");
+      });
     }
 
     return true;
