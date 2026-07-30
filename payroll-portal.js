@@ -48,9 +48,10 @@
     var style = document.createElement("style");
     style.id = "payrollPortalStyles";
     style.textContent =
-      "body:has(#payrollTabButton:focus) main>section.tab{display:none!important}" +
-      "body:has(#payrollTabButton:focus) main>#payroll.tab{display:block!important}" +
-      "body:has(#payrollTabButton:focus) #payrollTabButton{background:#ff4b00!important;color:#fff!important;border-color:#ff4b00!important}" +
+      "body:has(#payroll:target) main>section.tab{display:none!important}" +
+      "body:has(#payroll:target) main>#payroll.tab{display:block!important}" +
+      ".tabs a#payrollTabButton{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:0;border-radius:8px;color:inherit;text-decoration:none;font:inherit;font-weight:700;cursor:pointer}" +
+      "body:has(#payroll:target) #payrollTabButton{background:#ff4b00!important;color:#fff!important}" +
       "#payroll.payroll-portal-tab{padding:0!important;max-width:none!important;background:#0a0a0a}" +
       "#payroll .payroll-portal-shell{min-height:calc(100vh - 150px);background:#0a0a0a;border-top:3px solid #ff4b00}" +
       "#payroll .payroll-portal-bar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px max(18px,3vw);background:#0a0a0a;color:#fff;border-bottom:1px solid #292929}" +
@@ -90,6 +91,7 @@
       '<a class="payroll-portal-open" href="' +
       PAYROLL_URL +
       '" target="_blank" rel="noopener noreferrer">Open Payroll System</a>' +
+      '<a class="payroll-portal-open" href="#">Back to Dashboard</a>' +
       "</div>" +
       '<iframe class="payroll-portal-frame" src="' +
       PAYROLL_URL +
@@ -100,17 +102,14 @@
     payroll.dataset.portalInstalled = "true";
 
     var tabButton = document.getElementById("payrollTabButton");
-    if (tabButton) {
-      tabButton.textContent = "Payroll";
-      tabButton.setAttribute("aria-label", "Open 15M Autocare Payroll System");
-      var durableActivation = function (event) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        activatePayrollTab(payroll, tabButton);
-      };
-      tabButton.onpointerdown = durableActivation;
-      tabButton.onmousedown = durableActivation;
-      tabButton.onclick = durableActivation;
+    if (tabButton && tabButton.tagName !== "A") {
+      var tabLink = document.createElement("a");
+      tabLink.id = "payrollTabButton";
+      tabLink.className = tabButton.className;
+      tabLink.href = "#payroll";
+      tabLink.textContent = "Payroll";
+      tabLink.setAttribute("aria-label", "Open 15M Autocare Payroll System");
+      tabButton.parentNode.replaceChild(tabLink, tabButton);
     }
 
     return true;
