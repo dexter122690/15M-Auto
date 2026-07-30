@@ -4,6 +4,44 @@
   var PAYROLL_URL =
     "https://autocare-15m-payroll.dexterbsanagustin.chatgpt.site/";
 
+  function activatePayrollTab(payroll, tabButton) {
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".tabs button"),
+      function (button) {
+        button.classList.remove("active");
+      }
+    );
+    Array.prototype.forEach.call(
+      document.querySelectorAll("main > section.tab"),
+      function (section) {
+        section.classList.remove("active");
+      }
+    );
+    tabButton.classList.add("active");
+    payroll.classList.add("active");
+  }
+
+  if (!window.__payrollPortalTabHandler) {
+    document.addEventListener(
+      "click",
+      function (event) {
+        var tabButton =
+          event.target.closest &&
+          event.target.closest("#payrollTabButton");
+        if (!tabButton) return;
+
+        var payroll = document.getElementById("payroll");
+        if (!payroll) return;
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        activatePayrollTab(payroll, tabButton);
+      },
+      true
+    );
+    window.__payrollPortalTabHandler = true;
+  }
+
   function addStyles() {
     if (document.getElementById("payrollPortalStyles")) return;
 
@@ -63,22 +101,6 @@
       tabButton.textContent = "Payroll";
       tabButton.setAttribute("aria-label", "Open 15M Autocare Payroll System");
       tabButton.removeAttribute("onclick");
-      tabButton.addEventListener("click", function () {
-        Array.prototype.forEach.call(
-          document.querySelectorAll(".tabs button"),
-          function (button) {
-            button.classList.remove("active");
-          }
-        );
-        Array.prototype.forEach.call(
-          document.querySelectorAll("main > section.tab"),
-          function (section) {
-            section.classList.remove("active");
-          }
-        );
-        tabButton.classList.add("active");
-        payroll.classList.add("active");
-      });
     }
 
     return true;
