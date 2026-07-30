@@ -152,25 +152,21 @@
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
   }
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest && event.target.closest("#payrollTabButton");
+    var panel = document.getElementById("payroll");
+    if (!button || !panel) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (tab) {
+      tab.classList.remove("active");
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("main > section.tab"), function (section) {
+      section.classList.remove("active");
+    });
+    button.classList.add("active");
+    panel.classList.add("active");
+    history.replaceState(null, "", location.pathname + location.search + "#payroll");
+  }, true);
 })();
-
-
-document.addEventListener("click", function (event) {
-  var button = event.target.closest && event.target.closest("#payrollTabButton");
-  var panel = document.getElementById("payroll");
-  if (!button || !panel) return;
-
-  event.preventDefault();
-  event.stopImmediatePropagation();
-
-  Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (tab) {
-    tab.classList.remove("active");
-  });
-  Array.prototype.forEach.call(document.querySelectorAll("main > section.tab"), function (section) {
-    section.classList.remove("active");
-  });
-
-  button.classList.add("active");
-  panel.classList.add("active");
-  history.replaceState(null, "", location.pathname + location.search + "#payroll");
-}, true);
