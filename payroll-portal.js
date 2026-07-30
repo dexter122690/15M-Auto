@@ -48,6 +48,9 @@
     var style = document.createElement("style");
     style.id = "payrollPortalStyles";
     style.textContent =
+      "body:has(#payrollTabButton:focus) main>section.tab{display:none!important}" +
+      "body:has(#payrollTabButton:focus) main>#payroll.tab{display:block!important}" +
+      "body:has(#payrollTabButton:focus) #payrollTabButton{background:#ff4b00!important;color:#fff!important;border-color:#ff4b00!important}" +
       "#payroll.payroll-portal-tab{padding:0!important;max-width:none!important;background:#0a0a0a}" +
       "#payroll .payroll-portal-shell{min-height:calc(100vh - 150px);background:#0a0a0a;border-top:3px solid #ff4b00}" +
       "#payroll .payroll-portal-bar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px max(18px,3vw);background:#0a0a0a;color:#fff;border-bottom:1px solid #292929}" +
