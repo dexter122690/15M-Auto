@@ -247,6 +247,39 @@
   }, 250);
   begin();
   if (repairedLocalBranchStorage) setTimeout(function () { location.reload(); }, 50);
+  // Keep the report period controls consistent for every branch. The report
+  // renderers filter by each record's YYYY-MM-DD date, so this preserves both
+  // branches' data while making the same period choices available everywhere.
+  function ensureReportPeriodOptions() {
+    const latestYear = new Date().getFullYear();
+    const years = [];
+    for (let year = 2019; year <= latestYear; year += 1) years.push(String(year));
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.querySelectorAll('#salesYear,#expenseYear,#dashboardYear').forEach(function (select) {
+      const selected = select.value;
+      years.forEach(function (year) {
+        if (!Array.from(select.options).some(function (option) { return option.value === year; })) {
+          const option = document.createElement('option'); option.value = year; option.textContent = year; select.appendChild(option);
+        }
+      });
+      if (selected && Array.from(select.options).some(function (option) { return option.value === selected; })) select.value = selected;
+    });
+    document.querySelectorAll('#salesMonth,#expenseMonth,#dashboardMonth').forEach(function (select) {
+      months.forEach(function (month, index) {
+        const value = String(index + 1).padStart(2, '0');
+        if (!Array.from(select.options).some(function (option) { return option.value === value; })) {
+          const option = document.createElement('option'); option.value = value; option.textContent = month; select.appendChild(option);
+        }
+      });
+    });
+  }
+  const reportPeriodWatcher = new MutationObserver(ensureReportPeriodOptions);
+  reportPeriodWatcher.observe(document.body, { childList: true, subtree: true });
+  const reportPeriodTimer = setInterval(function () {
+    ensureReportPeriodOptions();
+    if (document.querySelectorAll('#salesYear,#expenseYear,#dashboardYear').length === 3) clearInterval(reportPeriodTimer);
+  }, 200);
+  ensureReportPeriodOptions();
 }());
 
 /* Quick client lookup for Invoice Making and Sales Report. */
